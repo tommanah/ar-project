@@ -10,12 +10,14 @@
   </head>
   <body style="margin: 0; padding: 0;">
     <!-- A-Frame сцена -->
-    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: true;">
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
       <!-- Сетка пространства -->
-      <a-entity geometry="primitive: plane; height: 10; width: 10" 
-                material="wireframe: true; color: #00FF00;" 
-                rotation="-90 0 0" 
-                position="0 0 -5"></a-entity>
+      <a-grid
+        position="0 0 -5"
+        height="10"
+        width="10"
+        material="color: #00FF00;"
+        grid="height: 10; width: 10; divisions: 10;"></a-grid>
 
       <!-- Камера -->
       <a-entity camera></a-entity>
