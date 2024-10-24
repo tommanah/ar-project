@@ -11,5 +11,11 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": ""
+  "description": "",
+  "dependencies": {
+    "aframe": "^1.6.0",
+    "ar.js": "^2.2.2",
+    "three": "^0.169.0",
+    "webxr-polyfill": "^2.0.3"
+  }
 }
