@@ -3,22 +3,24 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR Sphere</title>
+    <title>AR Sphere without Markers</title>
 
     <!-- Подключаем A-Frame -->
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
 
-    <!-- Подключаем AR.js для работы с дополненной реальностью -->
+    <!-- Подключаем AR.js с поддержкой WebXR -->
     <script src="https://cdn.rawgit.com/jeromeetienne/AR.js/2.1.4/aframe/build/aframe-ar.js"></script>
   </head>
   <body style="margin: 0; overflow: hidden;">
-    <!-- Сцена A-Frame с AR.js -->
-    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
-      <!-- Создаём сферу -->
-      <a-sphere position="0 0.5 0" radius="0.5" color="#FF5733"></a-sphere>
+    <!-- A-Frame сцена для AR -->
+    <a-scene embedded arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;">
 
-      <!-- Камера AR.js -->
-      <a-marker-camera preset="hiro"></a-marker-camera>
+      <!-- Сфера, которую мы будем отображать в AR -->
+      <a-sphere position="0 0.5 -2" radius="0.5" color="#FF5733"></a-sphere>
+
+      <!-- Камера с использованием WebXR для отслеживания положения устройства -->
+      <a-entity camera look-controls="enabled: true; touchEnabled: true; mouseEnabled: true; pointerLockEnabled: true;"></a-entity>
+      
     </a-scene>
   </body>
 </html>
