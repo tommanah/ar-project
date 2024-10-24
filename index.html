@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR.js + A-Frame: Сетка пространства</title>
+    <title>AR.js + A-Frame: Пространственная сетка</title>
     <!-- Подключение A-Frame и AR.js -->
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://cdn.rawgit.com/jeromeetienne/AR.js/2.1.4/aframe/build/aframe-ar.js"></script>
@@ -11,13 +11,32 @@
   <body style="margin: 0; padding: 0;">
     <!-- A-Frame сцена -->
     <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
-      <!-- Сетка пространства -->
-      <a-grid
-        position="0 0 -5"
-        height="10"
-        width="10"
-        material="color: #00FF00;"
-        grid="height: 10; width: 10; divisions: 10;"></a-grid>
+      <!-- Линии сетки -->
+      <a-entity position="0 0 -5">
+        <!-- Вертикальные линии -->
+        <a-entity geometry="primitive: box; height: 10; width: 0.05" material="color: #00FF00" position="-4.5 0 0"></a-entity>
+        <a-entity geometry="primitive: box; height: 10; width: 0.05" material="color: #00FF00" position="-3.5 0 0"></a-entity>
+        <a-entity geometry="primitive: box; height: 10; width: 0.05" material="color: #00FF00" position="-2.5 0 0"></a-entity>
+        <a-entity geometry="primitive: box; height: 10; width: 0.05" material="color: #00FF00" position="-1.5 0 0"></a-entity>
+        <a-entity geometry="primitive: box; height: 10; width: 0.05" material="color: #00FF00" position="-0.5 0 0"></a-entity>
+        <a-entity geometry="primitive: box; height: 10; width: 0.05" material="color: #00FF00" position="0.5 0 0"></a-entity>
+        <a-entity geometry="primitive: box; height: 10; width: 0.05" material="color: #00FF00" position="1.5 0 0"></a-entity>
+        <a-entity geometry="primitive: box; height: 10; width: 0.05" material="color: #00FF00" position="2.5 0 0"></a-entity>
+        <a-entity geometry="primitive: box; height: 10; width: 0.05" material="color: #00FF00" position="3.5 0 0"></a-entity>
+        <a-entity geometry="primitive: box; height: 10; width: 0.05" material="color: #00FF00" position="4.5 0 0"></a-entity>
+
+        <!-- Горизонтальные линии -->
+        <a-entity geometry="primitive: box; width: 10; height: 0.05" material="color: #00FF00" position="0 -4.5 0"></a-entity>
+        <a-entity geometry="primitive: box; width: 10; height: 0.05" material="color: #00FF00" position="0 -3.5 0"></a-entity>
+        <a-entity geometry="primitive: box; width: 10; height: 0.05" material="color: #00FF00" position="0 -2.5 0"></a-entity>
+        <a-entity geometry="primitive: box; width: 10; height: 0.05" material="color: #00FF00" position="0 -1.5 0"></a-entity>
+        <a-entity geometry="primitive: box; width: 10; height: 0.05" material="color: #00FF00" position="0 -0.5 0"></a-entity>
+        <a-entity geometry="primitive: box; width: 10; height: 0.05" material="color: #00FF00" position="0 0.5 0"></a-entity>
+        <a-entity geometry="primitive: box; width: 10; height: 0.05" material="color: #00FF00" position="0 1.5 0"></a-entity>
+        <a-entity geometry="primitive: box; width: 10; height: 0.05" material="color: #00FF00" position="0 2.5 0"></a-entity>
+        <a-entity geometry="primitive: box; width: 10; height: 0.05" material="color: #00FF00" position="0 3.5 0"></a-entity>
+        <a-entity geometry="primitive: box; width: 10; height: 0.05" material="color: #00FF00" position="0 4.5 0"></a-entity>
+      </a-entity>
 
       <!-- Камера -->
       <a-entity camera></a-entity>
