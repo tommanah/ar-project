@@ -1,23 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AR Application</title>
-  <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.min.js"></script>
-</head>
-<body style="margin: 0; padding: 0;">
-  <!-- AR-сцена -->
-  <a-scene embedded arjs>
-    <a-marker preset="hiro">
-      <a-box position="0 0.5 0" material="color: green;" 
-        event-set__click="material.color: yellow" 
-        animation="property: rotation; to: 360 360 360; loop: true; dur: 2000">
-      </a-box>
-    </a-marker>
-    <a-entity camera></a-entity>
-  </a-scene>
-  
-</body>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebXR Plane Detection</title>
+    <script src="https://threejs.org/build/three.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@webxr-polyfill/webxr-polyfill@latest/build/webxr-polyfill.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.135.0/examples/jsm/webxr/ARButton.js"></script>
+  </head>
+  <body style="margin: 0; padding: 0;">
+    <script>
+      let scene, camera, renderer;
+
+      function init() {
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
+
+        renderer.xr.enabled = true;
+        renderer.setAnimationLoop(animate);
+      }
+
+      function animate() {
+        renderer.render(scene, camera);
+      }
+
+      init();
+    </script>
+  </body>
 </html>
