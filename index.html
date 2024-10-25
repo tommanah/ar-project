@@ -12,118 +12,116 @@
     <script src="https://cdn.rawgit.com/jeromeetienne/AR.js/2.1.4/aframe/build/aframe-ar.js"></script>
   </head>
   <body style="margin: 0">
+    
+    <!-- Кнопка управления тепловой картой -->
+    <button onclick="toggleHeatmap()" style="position: fixed; top: 10px; left: 10px; z-index: 1000;">Toggle Heatmap</button>
+
     <a-scene>
-        <a-entity camera></a-entity>
-        <a-entity id="heatmap" visible="false"></a-entity>
-        <button onclick="toggleHeatmap()">Toggle Heatmap</button>
-      </a-scene>
-      
-      <canvas id="heatmapCanvas" style="position: absolute; top: 0; left: 0; pointer-events: none;"></canvas>
-      
-      <script>
-        let heatmapVisible = false;
-        const canvas = document.getElementById('heatmapCanvas');
-        const ctx = canvas.getContext('2d');
-        let video;
-      
-        function toggleHeatmap() {
-          heatmapVisible = !heatmapVisible;
-          document.getElementById('heatmap').setAttribute('visible', heatmapVisible);
-      
-          if (heatmapVisible) {
-            startDepthAnalysis();
-          } else {
-            stopDepthAnalysis();
-          }
+      <a-entity camera></a-entity>
+      <a-entity id="heatmap" visible="false"></a-entity>
+    </a-scene>
+    
+    <!-- Канвас для тепловой карты -->
+    <canvas id="heatmapCanvas" style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 999;"></canvas>
+
+    <script>
+      let heatmapVisible = false;
+      const canvas = document.getElementById('heatmapCanvas');
+      const ctx = canvas.getContext('2d');
+      let video;
+
+      function toggleHeatmap() {
+        heatmapVisible = !heatmapVisible;
+        document.getElementById('heatmap').setAttribute('visible', heatmapVisible);
+
+        if (heatmapVisible) {
+          startDepthAnalysis();
+        } else {
+          stopDepthAnalysis();
         }
-      
-        function startDepthAnalysis() {
-          // Инициализация камеры и захват данных
-          navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-            .then(stream => {
-              video = document.createElement('video');
-              video.srcObject = stream;
-              video.play();
-      
-              // Настройка размеров канваса, чтобы он соответствовал окну
-              canvas.width = window.innerWidth;
-              canvas.height = window.innerHeight;
-      
-              // Начинаем отрисовку тепловой карты
-              video.onloadedmetadata = () => {
-                drawHeatmap();
-              };
-            })
-            .catch(error => {
-              console.error("Ошибка доступа к камере:", error);
-            });
+      }
+
+      function startDepthAnalysis() {
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+          .then(stream => {
+            video = document.createElement('video');
+            video.srcObject = stream;
+            video.play();
+
+            // Установка размеров канваса под окно
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            // Отрисовка тепловой карты после загрузки видео
+            video.onloadedmetadata = () => {
+              drawHeatmap();
+            };
+          })
+          .catch(error => {
+            console.error("Ошибка доступа к камере:", error);
+          });
+      }
+
+      function drawHeatmap() {
+        if (!video || !heatmapVisible) return;
+
+        // Рисуем видео на канвасе
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Пример данных о глубине
+        const depthData = getDepthData(canvas.width, canvas.height);
+
+        // Применение данных о глубине для отображения тепловой карты
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+
+        for (let i = 0; i < data.length; i += 4) {
+          const depthValue = depthData[i / 4];
+          const color = depthToColor(depthValue);
+
+          data[i] = color.r;
+          data[i + 1] = color.g;
+          data[i + 2] = color.b;
+          data[i + 3] = 255;
         }
-      
-        function drawHeatmap() {
-          if (!video || !heatmapVisible) return;
-      
-          // Рисуем изображение с камеры на канвасе
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
-          // Пример данных о глубине (замените на реальные данные о глубине)
-          const depthData = getDepthData(canvas.width, canvas.height);
-      
-          // Обрабатываем пиксели для тепловой карты
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const data = imageData.data;
-      
-          for (let i = 0; i < data.length; i += 4) {
-            const depthValue = depthData[i / 4]; // Данные глубины для каждого пикселя
-            const color = depthToColor(depthValue);
-      
-            data[i] = color.r;       // Red
-            data[i + 1] = color.g;   // Green
-            data[i + 2] = color.b;   // Blue
-            data[i + 3] = 255;       // Alpha
-          }
-      
-          ctx.putImageData(imageData, 0, 0);
-      
-          // Продолжаем рендеринг тепловой карты
-          requestAnimationFrame(drawHeatmap);
+
+        ctx.putImageData(imageData, 0, 0);
+
+        requestAnimationFrame(drawHeatmap);
+      }
+
+      function stopDepthAnalysis() {
+        if (video && video.srcObject) {
+          const stream = video.srcObject;
+          const tracks = stream.getTracks();
+
+          tracks.forEach(track => track.stop());
+          video.srcObject = null;
         }
-      
-        function stopDepthAnalysis() {
-          if (video && video.srcObject) {
-            const stream = video.srcObject;
-            const tracks = stream.getTracks();
-      
-            tracks.forEach(track => track.stop()); // Остановка всех треков
-            video.srcObject = null;
-          }
-      
-          ctx.clearRect(0, 0, canvas.width, canvas.height); // Очистка канваса
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+
+      function getDepthData(width, height) {
+        const depthData = new Array(width * height);
+
+        for (let i = 0; i < depthData.length; i++) {
+          depthData[i] = Math.random() * 100;
         }
-      
-        // Функция для генерации примера данных о глубине
-        function getDepthData(width, height) {
-          const depthData = new Array(width * height);
-      
-          for (let i = 0; i < depthData.length; i++) {
-            depthData[i] = Math.random() * 100; // Примерные значения от 0 до 100
-          }
-      
-          return depthData;
-        }
-      
-        // Преобразование глубины в цвет для тепловой карты
-        function depthToColor(depth) {
-          const maxDepth = 100; // Максимальная глубина
-          const normalizedDepth = Math.min(depth / maxDepth, 1);
-      
-          const r = Math.floor(normalizedDepth * 255);
-          const g = 0;
-          const b = Math.floor((1 - normalizedDepth) * 255);
-      
-          return { r, g, b };
-        }
-      </script>
-      
-      
+
+        return depthData;
+      }
+
+      function depthToColor(depth) {
+        const maxDepth = 100;
+        const normalizedDepth = Math.min(depth / maxDepth, 1);
+
+        const r = Math.floor(normalizedDepth * 255);
+        const g = 0;
+        const b = Math.floor((1 - normalizedDepth) * 255);
+
+        return { r, g, b };
+      }
+    </script>
   </body>
 </html>
