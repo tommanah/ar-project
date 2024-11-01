@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR</title>
+    <title>AR Depth Map</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://cdn.rawgit.com/jeromeetienne/AR.js/2.1.4/aframe/build/aframe-ar.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
@@ -12,8 +12,9 @@
 <body style="margin: 0">
 
     <button onclick="toggleCameraAndSensors()" style="position: fixed; top: 10px; left: 10px; z-index: 1000;">Toggle Camera and Sensors</button>
+    <button onclick="updateDepthMap()" style="position: fixed; top: 50px; left: 10px; z-index: 1000;">Show Depth Map</button>
 
-    <div id="sensorData" style="position: fixed; top: 50px; left: 10px; background: rgba(255, 255, 255, 0.8); padding: 10px; z-index: 1000; display: none;">
+    <div id="sensorData" style="position: fixed; top: 100px; left: 10px; background: rgba(255, 255, 255, 0.8); padding: 10px; z-index: 1000; display: none;">
         <h3>Sensor Data</h3>
         <p><strong>Accelerometer:</strong></p>
         <p>x: <span id="accelX">0</span></p>
@@ -27,13 +28,14 @@
 
     <a-scene embedded arjs="sourceType: webcam;">
         <a-entity camera></a-entity>
-        <a-entity id="heatmap" visible="false"></a-entity>
     </a-scene>
-    <img id="heatmapImage" style="position: absolute; top: 50px; left: 150px; z-index: 1000;"/>
+    
+    <img id="heatmapImage" style="position: absolute; top: 100px; left: 150px; z-index: 1000; display: none;"/>
 
     <script>
         let sensorsActive = false;
         let videoStream;
+        let depthEstimator;
 
         function toggleCameraAndSensors() {
             sensorsActive = !sensorsActive;
@@ -42,6 +44,7 @@
             if (sensorsActive) {
                 startCamera();
                 startSensors();
+                initDepthModel(); // Инициализация модели глубины при активации сенсоров
             } else {
                 stopCamera();
                 stopSensors();
@@ -62,10 +65,6 @@
                 tracks.forEach(track => track.stop());
                 videoStream = null;
             }
-            const video = document.querySelector('video');
-            if (video) {
-                document.body.removeChild(video);
-            }
         }
 
         function startSensors() {
@@ -73,7 +72,7 @@
                 DeviceMotionEvent.requestPermission().then(response => {
                     if (response === 'granted') {
                         window.addEventListener('devicemotion', handleMotionEvent);
-                    }
+ }
                 }).catch(console.error);
             } else {
                 window.addEventListener('devicemotion', handleMotionEvent);
@@ -95,67 +94,48 @@
             window.removeEventListener('deviceorientation', handleOrientationEvent);
         }
 
-        function handleMotionEvent(event) {
-            document.getElementById('accelX').textContent = event.acceleration.x.toFixed(2);
-            document.getElementById('accelY').textContent = event.acceleration.y.toFixed(2);
-            document.getElementById('accelZ').textContent = event.acceleration.z.toFixed(2);
-        }
-
-        function handleOrientationEvent(event) {
- document.getElementById('gyroAlpha').textContent = event.alpha ? event.alpha.toFixed(2) : 0;
-            document.getElementById('gyroBeta').textContent = event.beta ? event.beta.toFixed(2) : 0;
-            document.getElementById('gyroGamma').textContent = event.gamma ? event.gamma.toFixed(2) : 0;
-        }
-
-        async function initDepthModel() {
-            const model = depthEstimation.SupportedModels.COCODepthEstimation;
-            const estimator = await depthEstimation.createEstimator(model);
-            return estimator;
-        }
-
-        async function updateDepthMap(estimator) {
-            const video = document.querySelector('video');
-            const depthMap = await estimator.estimateDepth(video);
-
-            const depthCanvas = document.createElement('canvas');
-            depthCanvas.width = video.videoWidth;
-            depthCanvas.height = video.videoHeight;
-
-            const ctx = depthCanvas.getContext('2d');
-            ctx.drawImage(depthMap.toCanvasImageSource(), 0, 0);
-
-            const coloredCanvas = document.createElement('canvas');
-            coloredCanvas.width = video.videoWidth;
-            coloredCanvas.height = video.videoHeight;
-
-            const coloredCtx = coloredCanvas.getContext('2d');
-
-            for (let y = 0; y < video.videoHeight; y++) {
-                for (let x = 0; x < video.videoWidth; x++) {
-                    const depthValue = depthMap.get(x, y);
-                    const color = depthValue < 0.5 ? 'red' : 'blue';
-                    coloredCtx.fillStyle = color;
-                    coloredCtx.fillRect(x, y, 1, 1);
-                }
-            }
-
-            ctx.drawImage(coloredCanvas, 0, 0);
-
-            const blob = await new Promise(resolve => depthCanvas.toBlob(resolve, 'image/png'));
-            const url = URL.createObjectURL(blob);
-            document.getElementById('heatmapImage').src = url;
-        }
-
         function handleVideoStream(stream) {
             videoStream = stream;
             const video = document.createElement('video');
             video.srcObject = stream;
-            document.body.appendChild(video);
             video.play();
+            document.body.appendChild(video);
+        }
 
-            initDepthModel().then(estimator => {
-                setInterval(() => updateDepthMap(estimator), 30);
-            });
+        function handleMotionEvent(event) {
+            const acceleration = event.acceleration;
+            document.getElementById('accelX').innerText = acceleration.x.toFixed(2);
+            document.getElementById('accelY').innerText = acceleration.y.toFixed(2);
+            document.getElementById('accelZ').innerText = acceleration.z.toFixed(2);
+        }
+
+        function handleOrientationEvent(event) {
+            document.getElementById('gyroAlpha').innerText = event.alpha.toFixed(2);
+            document.getElementById('gyroBeta').innerText = event.beta.toFixed(2);
+            document.getElementById('gyroGamma').innerText = event.gamma.toFixed(2);
+        }
+
+        async function initDepthModel() {
+            console.log("Инициализация модели глубины...");
+            const model = depthEstimation.SupportedModels.COCODepthEstimation;
+            depthEstimator = await depthEstimation.createEstimator(model);
+            console.log("Модель глубины инициализирована.");
+        }
+
+        async function updateDepthMap() {
+            console.log("Обновление карты глубины...");
+            const video = document.querySelector('video');
+            const depthMap = await depthEstimator.estimateDepth(video);
+
+            if (!depthMap) {
+                console.error("Не удалось получить карту глубины.");
+                return;
+            }
+
+            console.log("Карта глубины получена.");
+            const heatmapImage = document.getElementById('heatmapImage');
+            heatmapImage.src = depthMap.imageData;
+            heatmapImage.style.display = 'block';
         }
     </script>
 </body>
