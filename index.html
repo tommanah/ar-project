@@ -6,6 +6,8 @@
     <title>AR</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://cdn.rawgit.com/jeromeetienne/AR.js/2.1.4/aframe/build/aframe-ar.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/depth-estimation@latest/index.js"></script>
   </head>
   <body style="margin: 0">
 
@@ -23,9 +25,11 @@
       <p>gamma: <span id="gyroGamma">0</span></p>
     </div>
 
-    <a-scene>
+    <a-scene embedded arjs="sourceType: webcam;"> <!-- работает это вообще или нет я хз-->
       <a-entity camera></a-entity>
       <a-entity id="heatmap" visible="false"></a-entity>
+      <div id="heatmap"></div>
+
     </a-scene>
     
     <script>
@@ -47,27 +51,24 @@
 
       function startCamera() {
         navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-          .then(stream => {
-            const video = document.createElement('video');
-            video.srcObject = stream;
-            video.play();
-          })
-          .catch(error => {
+        .then(handleVideoStream)
+        .catch(error => {
             console.error("Ошибка доступа к камере:", error);
-          });
-      }
+    });
+}
+
 
       function stopAR() {
-    if (videoStream) {
-      const tracks = videoStream.getTracks();
-      tracks.forEach(track => track.stop());
-      videoStream = null;
-    }
+        if (videoStream) {
+        const tracks = videoStream.getTracks();
+        tracks.forEach(track => track.stop());
+        videoStream = null;
+        }
 
-    const video = document.querySelector('video');
-    if (video) {
-      document.body.removeChild(video);
-    }}
+        const video = document.querySelector('video');
+        if (video) {
+             document.body.removeChild(video);
+        }}
 
       function startSensors() {
         // Проверяем наличие сенсоров
@@ -108,6 +109,64 @@
         document.getElementById('gyroBeta').textContent = event.beta ? event.beta.toFixed(2) : 0;
         document.getElementById('gyroGamma').textContent = event.gamma ? event.gamma.toFixed(2) : 0;
       }
+
+      // Инициализация модели глубины
+async function initDepthModel() {
+  const model = depthEstimation.SupportedModels.COCODepthEstimation;
+  const estimator = await depthEstimation.createEstimator(model);
+  
+  return estimator;
+}
+
+// Функция для обновления карты глубины
+async function updateDepthMap(estimator) {
+  const video = document.querySelector('video');
+  const depthMap = await estimator.estimateDepth(video);
+
+  // Преобразование depthMap в изображение
+  const depthCanvas = document.createElement('canvas');
+  depthCanvas.width = video.videoWidth;
+  depthCanvas.height = video.videoHeight;
+
+  const ctx = depthCanvas.getContext('2d');
+  ctx.drawImage(depthMap.toCanvasImageSource(), 0, 0);
+
+  // Применение колоризации
+  const coloredCanvas = document.createElement('canvas');
+  coloredCanvas.width = video.videoWidth;
+  coloredCanvas.height = video.videoHeight;
+
+  const coloredCtx = coloredCanvas.getContext('2d');
+
+  // Красный для близких объектов, синий для дальних
+  for (let y = 0; y < video.videoHeight; y++) {
+    for (let x = 0; x < video.videoWidth; x++) {
+      const depthValue = depthMap.get(x, y);
+      const color = depthValue < 0.5 ? 'red' : 'blue';
+      coloredCtx.fillStyle = color;
+      coloredCtx.fillRect(x, y, 1, 1);
+    }
+  }
+
+  // Обновление отображения
+  ctx.drawImage(coloredCanvas, 0, 0);
+
+  // Вставка обновленной карты глубины в AR.js
+  document.getElementById('heatmap').srcObject = depthCanvas.toBlob(() => {}, 'image/png');
+}
+
+// Функция для обработки видео потока
+function handleVideoStream(stream) {
+  const video = document.createElement('video');
+  video.srcObject = stream;
+  video.play();
+
+  // Инициализация модели и обновление карты глубины при каждом кадре
+  initDepthModel().then(estimator => {
+    setInterval(() => updateDepthMap(estimator), 30); // Обновление каждые 30 мс
+  });
+}
+
     </script>
   </body>
 </html>
