@@ -10,148 +10,49 @@
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/depth-estimation@latest/index.js"></script>
   </head>
   <body style="margin: 0">
-    <button
-      onclick="toggleCameraAndSensors()"
-      style="position: fixed; top: 10px; left: 10px; z-index: 1000"
-    >
-      Toggle Camera and Sensors
-    </button>
-    <button
-      onclick="updateDepthMap()"
-      style="position: fixed; top: 50px; left: 10px; z-index: 1000"
-    >
-      Show Depth Map
-    </button>
-
-    <div
-      id="sensorData"
-      style="
-        position: fixed;
-        top: 100px;
-        left: 10px;
-        background: rgba(255, 255, 255, 0.8);
-        padding: 10px;
-        z-index: 1000;
-        display: none;
-      "
-    >
-      <h3>Sensor Data</h3>
-      <p><strong>Accelerometer:</strong></p>
-      <p>x: <span id="accelX">0</span></p>
-      <p>y: <span id="accelY">0</span></p>
-      <p>z: <span id="accelZ">0</span></p>
-      <p><strong>Gyroscope:</strong></p>
-      <p>alpha: <span id="gyroAlpha">0</span></p>
-      <p>beta: <span id="gyroBeta">0</span></p>
-      <p>gamma: <span id="gyroGamma">0</span></p>
-    </div>
+    <button onclick="toggleCameraAndSensors()" style="position: fixed; top: 10px; left: 10px; z-index: 1000">Toggle Camera and Sensors</button>
+    <canvas id="depthCanvas" style="position: absolute; top: 100px; left: 150px; z-index: 1000; display: none; width: 320px; height: 240px;"></canvas>
 
     <a-scene embedded arjs="sourceType: webcam;">
       <a-entity camera></a-entity>
     </a-scene>
 
-    <img
-      id="heatmapImage"
-      style="
-        position: absolute;
-        top: 100px;
-        left: 150px;
-        z-index: 1000;
-        display: none;
-      "
-    />
-
     <script>
       let sensorsActive = false;
       let videoStream;
       let depthEstimator;
+      let depthUpdateInterval;
 
-      function toggleCameraAndSensors() {
+      async function toggleCameraAndSensors() {
         sensorsActive = !sensorsActive;
-        document.getElementById("sensorData").style.display = sensorsActive
-          ? "block"
-          : "none";
 
         if (sensorsActive) {
-          startCamera();
-          startSensors();
-          initDepthModel();
+          await startCamera();
+          await initDepthModel();
+          startDepthUpdates();
         } else {
+          stopDepthUpdates();
           stopCamera();
-          stopSensors();
         }
       }
 
-      function startCamera() {
-        navigator.mediaDevices
-          .getUserMedia({ video: { facingMode: "environment" } })
-          .then(handleVideoStream)
-          .catch((error) => {
-            console.error("Ошибка доступа к камере:", error);
-          });
+      async function startCamera() {
+        try {
+          videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+          const video = document.createElement("video");
+          video.srcObject = videoStream;
+          await video.play();
+          document.body.appendChild(video);
+        } catch (error) {
+          console.error("Ошибка доступа к камере:", error);
+        }
       }
 
       function stopCamera() {
         if (videoStream) {
-          const tracks = videoStream.getTracks();
-          tracks.forEach((track) => track.stop());
+          videoStream.getTracks().forEach(track => track.stop());
           videoStream = null;
         }
-      }
-
-      function startSensors() {
-        if (typeof DeviceMotionEvent.requestPermission === "function") {
-          DeviceMotionEvent.requestPermission()
-            .then((response) => {
-              if (response === "granted") {
-                window.addEventListener("devicemotion", handleMotionEvent);
-              }
-            })
-            .catch(console.error);
-        } else {
-          window.addEventListener("devicemotion", handleMotionEvent);
-        }
-
-        if (typeof DeviceOrientationEvent.requestPermission === "function") {
-          DeviceOrientationEvent.requestPermission()
-            .then((response) => {
-              if (response === "granted") {
-                window.addEventListener(
-                  "deviceorientation",
-                  handleOrientationEvent,
-                );
-              }
-            })
-            .catch(console.error);
-        } else {
-          window.addEventListener("deviceorientation", handleOrientationEvent);
-        }
-      }
-
-      function stopSensors() {
-        window.removeEventListener("devicemotion", handleMotionEvent);
-        window.removeEventListener("deviceorientation", handleOrientationEvent);
-      }
-
-      function handleVideoStream(stream) {
-        videoStream = stream;
-        const video = document.createElement("video");
-        video.srcObject = stream;
-        video.play();
-        document.body.appendChild(video);
-      }
-
-      function handleMotionEvent(event) {
-        const acceleration = event.acceleration;
-        document.getElementById("accelX").innerText = acceleration.x.toFixed(2);
-        document.getElementById("accelY").innerText = acceleration.y.toFixed(2);
-        document.getElementById("accelZ").innerText = acceleration.z.toFixed(2);
-      }
-
-      function handleOrientationEvent(event) {
-        document.getElementById("gyroAlpha").innerText = event.alpha.toFixed(2);
-        document.getElementById("gyroBeta").innerText = event.beta.toFixed(2);
-        document.getElementById("gyroGamma").innerText = event.gamma.toFixed(2);
       }
 
       async function initDepthModel() {
@@ -161,21 +62,5 @@
         console.log("Модель глубины инициализирована.");
       }
 
-      async function updateDepthMap() {
-        console.log("Обновление карты глубины...");
-        const video = document.querySelector("video");
-        const depthMap = await depthEstimator.estimateDepth(video);
-
-        if (!depthMap) {
-          console.error("Не удалось получить карту глубины.");
-          return;
-        }
-
-        console.log("Карта глубины получена.");
-        const heatmapImage = document.getElementById("heatmapImage");
-        heatmapImage.src = depthMap.imageData;
-        heatmapImage.style.display = "block";
-      }
-    </script>
-  </body>
-</html>
+      function startDepthUpdates() {
+        depthUpdateInterval = requestAnim
