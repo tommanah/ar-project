@@ -22,10 +22,10 @@
       let videoStream;
       let depthEstimator;
       let depthUpdateInterval;
-
+      
       async function toggleCameraAndSensors() {
         sensorsActive = !sensorsActive;
-
+        
         if (sensorsActive) {
           await startCamera();
           await initDepthModel();
@@ -63,4 +63,46 @@
       }
 
       function startDepthUpdates() {
-        depthUpdateInterval = requestAnim
+        depthUpdateInterval = requestAnimationFrame(updateDepthMap);
+        document.getElementById("depthCanvas").style.display = "block";
+      }
+
+      function stopDepthUpdates() {
+        cancelAnimationFrame(depthUpdateInterval);
+        const canvas = document.getElementById("depthCanvas");
+        const ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        canvas.style.display = "none";
+      }
+
+      async function updateDepthMap() {
+        const video = document.querySelector("video");
+        if (depthEstimator && video.readyState === video.HAVE_ENOUGH_DATA) {
+          const depthMap = await depthEstimator.estimateDepth(video);
+
+          if (depthMap) {
+            const depthData = depthMap.dataSync();
+            const canvas = document.getElementById("depthCanvas");
+            const ctx = canvas.getContext("2d");
+            const width = canvas.width;
+            const height = canvas.height;
+            const imageData = ctx.createImageData(width, height);
+
+            for (let i = 0; i < depthData.length; i++) {
+              const depthValue = Math.floor((1 - depthData[i]) * 255);
+              imageData.data[i * 4] = depthValue;
+              imageData.data[i * 4 + 1] = 0;
+              imageData.data[i * 4 + 2] = 255 - depthValue;
+              imageData.data[i * 4 + 3] = 255;
+            }
+            
+            ctx.putImageData(imageData, 0, 0);
+          } else {
+            console.error("Не удалось получить карту глубины.");
+          }
+        }
+        depthUpdateInterval = requestAnimationFrame(updateDepthMap);
+      }
+    </script>
+  </body>
+</html>
