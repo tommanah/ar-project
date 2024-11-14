@@ -5,103 +5,89 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AR Depth Map</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-    <script src="https://cdn.rawgit.com/jeromeetienne/AR.js/2.1.4/aframe/build/aframe-ar.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/depth-estimation@latest/index.js"></script>
+    <style>
+      #depthCanvas {
+        position: fixed;
+        top: 100px;
+        left: 10px;
+        width: 320px;
+        height: 240px;
+        z-index: 1000;
+        display: none;
+      }
+      #toggleButton {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        z-index: 1001;
+        padding: 10px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        cursor: pointer;
+      }
+    </style>
   </head>
   <body style="margin: 0">
-    <button onclick="toggleCameraAndSensors()" style="position: fixed; top: 10px; left: 10px; z-index: 1000">Toggle Camera and Sensors</button>
-    <canvas id="depthCanvas" style="position: absolute; top: 100px; left: 150px; z-index: 1000; display: none; width: 320px; height: 240px;"></canvas>
+    <button id="toggleButton" onclick="toggleDepthMap()">Показать карту глубины</button>
+    <canvas id="depthCanvas"></canvas>
 
     <a-scene embedded arjs="sourceType: webcam;">
       <a-entity camera></a-entity>
     </a-scene>
 
     <script>
-      let sensorsActive = false;
-      let videoStream;
       let depthEstimator;
-      let depthUpdateInterval;
-      
-      async function toggleCameraAndSensors() {
-        sensorsActive = !sensorsActive;
-        
-        if (sensorsActive) {
-          await startCamera();
-          await initDepthModel();
-          startDepthUpdates();
-        } else {
-          stopDepthUpdates();
-          stopCamera();
-        }
+      let depthCanvas = document.getElementById("depthCanvas");
+      let depthContext = depthCanvas.getContext("2d");
+      let video;
+
+      async function initializeDepthModel() {
+        const model = depthEstimation.SupportedModels.COCODepthEstimation;
+        depthEstimator = await depthEstimation.createEstimator(model);
       }
 
       async function startCamera() {
-        try {
-          videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-          const video = document.createElement("video");
-          video.srcObject = videoStream;
-          await video.play();
-          document.body.appendChild(video);
-        } catch (error) {
-          console.error("Ошибка доступа к камере:", error);
-        }
-      }
-
-      function stopCamera() {
-        if (videoStream) {
-          videoStream.getTracks().forEach(track => track.stop());
-          videoStream = null;
-        }
-      }
-
-      async function initDepthModel() {
-        console.log("Инициализация модели глубины...");
-        const model = depthEstimation.SupportedModels.COCODepthEstimation;
-        depthEstimator = await depthEstimation.createEstimator(model);
-        console.log("Модель глубины инициализирована.");
-      }
-
-      function startDepthUpdates() {
-        depthUpdateInterval = requestAnimationFrame(updateDepthMap);
-        document.getElementById("depthCanvas").style.display = "block";
-      }
-
-      function stopDepthUpdates() {
-        cancelAnimationFrame(depthUpdateInterval);
-        const canvas = document.getElementById("depthCanvas");
-        const ctx = canvas.getContext("2d");
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        canvas.style.display = "none";
+        video = document.createElement("video");
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        video.srcObject = stream;
+        await video.play();
       }
 
       async function updateDepthMap() {
-        const video = document.querySelector("video");
         if (depthEstimator && video.readyState === video.HAVE_ENOUGH_DATA) {
           const depthMap = await depthEstimator.estimateDepth(video);
+          const depthData = depthMap.dataSync();
+          const width = 320, height = 240;
+          depthCanvas.width = width;
+          depthCanvas.height = height;
 
-          if (depthMap) {
-            const depthData = depthMap.dataSync();
-            const canvas = document.getElementById("depthCanvas");
-            const ctx = canvas.getContext("2d");
-            const width = canvas.width;
-            const height = canvas.height;
-            const imageData = ctx.createImageData(width, height);
-
-            for (let i = 0; i < depthData.length; i++) {
-              const depthValue = Math.floor((1 - depthData[i]) * 255);
-              imageData.data[i * 4] = depthValue;
-              imageData.data[i * 4 + 1] = 0;
-              imageData.data[i * 4 + 2] = 255 - depthValue;
-              imageData.data[i * 4 + 3] = 255;
-            }
-            
-            ctx.putImageData(imageData, 0, 0);
-          } else {
-            console.error("Не удалось получить карту глубины.");
+          const imageData = depthContext.createImageData(width, height);
+          for (let i = 0; i < depthData.length; i++) {
+            const depthValue = Math.floor((1 - depthData[i]) * 255);
+            imageData.data[i * 4] = depthValue;         // Red
+            imageData.data[i * 4 + 1] = 0;             // Green
+            imageData.data[i * 4 + 2] = 255 - depthValue; // Blue
+            imageData.data[i * 4 + 3] = 255;           // Alpha
           }
+          depthContext.putImageData(imageData, 0, 0);
         }
-        depthUpdateInterval = requestAnimationFrame(updateDepthMap);
+        requestAnimationFrame(updateDepthMap);
+      }
+
+      async function toggleDepthMap() {
+        if (depthCanvas.style.display === "none") {
+          document.getElementById("toggleButton").innerText = "Скрыть карту глубины";
+          depthCanvas.style.display = "block";
+          if (!video) await startCamera();
+          if (!depthEstimator) await initializeDepthModel();
+          updateDepthMap();
+        } else {
+          document.getElementById("toggleButton").innerText = "Показать карту глубины";
+          depthCanvas.style.display = "none";
+        }
       }
     </script>
   </body>
