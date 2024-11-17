@@ -97,70 +97,61 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Depth Estimation with Camera</title>
-  <script src="https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.17.0/dist/transformers.js"></script>
+  <title>Depth Estimation with OpenCV4.js</title>
+  <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
 </head>
 <body>
   <h1>Depth Estimation from Camera Stream</h1>
   <video id="video" width="640" height="480" autoplay></video>
   <canvas id="canvas" width="640" height="480"></canvas>
-  
+
   <script>
-    // Initialize camera stream
-    async function initCamera() {
+    // Initialize OpenCV.js
+    function onOpenCvReady() {
+      // Initialize camera stream
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then((stream) => {
+          const video = document.getElementById('video');
+          video.srcObject = stream;
+          video.play();
+        })
+        .catch(err => console.error("Camera access denied", err));
+    }
+
+    // Process the video stream to calculate depth
+    function processVideo() {
       const video = document.getElementById('video');
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true
-      });
-      video.srcObject = stream;
-    }
-
-    // Load the pre-trained depth estimation model
-    async function loadModel() {
-      const model = await window.Transformers.load("huggingface/transformers.js", "depth-estimation");
-      return model;
-    }
-
-    // Process the video frame and predict depth
-    async function predictDepth(model, video) {
       const canvas = document.getElementById('canvas');
       const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const result = await model.estimateDepth(imageData);
-      drawDepthMap(result);
-    }
-
-    // Draw the depth map on the canvas
-    function drawDepthMap(depthMap) {
-      const canvas = document.getElementById('canvas');
-      const ctx = canvas.getContext('2d');
-      const imageData = ctx.createImageData(canvas.width, canvas.height);
+      // Create OpenCV Mat from video
+      let mat = cv.imread(video);
       
-      for (let i = 0; i < depthMap.length; i++) {
-        const depthValue = depthMap[i];
-        imageData.data[i * 4 + 0] = depthValue; // Red channel (depth visualization)
-        imageData.data[i * 4 + 1] = depthValue;
-        imageData.data[i * 4 + 2] = depthValue;
-        imageData.data[i * 4 + 3] = 255; // Alpha channel
-      }
+      // Convert to grayscale (for depth approximation)
+      let gray = new cv.Mat();
+      cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY);
 
-      ctx.putImageData(imageData, 0, 0);
+      // Apply edge detection or depth estimation algorithm
+      let depthMap = new cv.Mat();
+      cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 1.5, 1.5);
+      cv.Canny(gray, depthMap, 50, 100);
+
+      // Draw the processed result on the canvas
+      cv.imshow(canvas, depthMap);
+
+      // Release resources
+      mat.delete();
+      gray.delete();
+      depthMap.delete();
     }
 
-    // Initialize everything
-    async function start() {
-      await initCamera();
-      const model = await loadModel();
-      const video = document.getElementById('video');
-      
-      setInterval(() => {
-        predictDepth(model, video);
-      }, 100); // Predict every 100ms
+    // Call the OpenCV ready function
+    if (cv.getBuildInformation) {
+      onOpenCvReady();
+      setInterval(processVideo, 100); // Process every 100 ms
+    } else {
+      console.log("OpenCV.js is not ready yet.");
     }
-
-    start();
   </script>
 </body>
 </html>
