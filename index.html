@@ -1,4 +1,4 @@
-<!doctype html>
+<!-- <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -91,4 +91,76 @@
       }
     </script>
   </body>
+</html> -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Depth Estimation with Camera</title>
+  <script src="https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.17.0/dist/transformers.js"></script>
+</head>
+<body>
+  <h1>Depth Estimation from Camera Stream</h1>
+  <video id="video" width="640" height="480" autoplay></video>
+  <canvas id="canvas" width="640" height="480"></canvas>
+  
+  <script>
+    // Initialize camera stream
+    async function initCamera() {
+      const video = document.getElementById('video');
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true
+      });
+      video.srcObject = stream;
+    }
+
+    // Load the pre-trained depth estimation model
+    async function loadModel() {
+      const model = await window.Transformers.load("huggingface/transformers.js", "depth-estimation");
+      return model;
+    }
+
+    // Process the video frame and predict depth
+    async function predictDepth(model, video) {
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const result = await model.estimateDepth(imageData);
+      drawDepthMap(result);
+    }
+
+    // Draw the depth map on the canvas
+    function drawDepthMap(depthMap) {
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+      const imageData = ctx.createImageData(canvas.width, canvas.height);
+      
+      for (let i = 0; i < depthMap.length; i++) {
+        const depthValue = depthMap[i];
+        imageData.data[i * 4 + 0] = depthValue; // Red channel (depth visualization)
+        imageData.data[i * 4 + 1] = depthValue;
+        imageData.data[i * 4 + 2] = depthValue;
+        imageData.data[i * 4 + 3] = 255; // Alpha channel
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+    }
+
+    // Initialize everything
+    async function start() {
+      await initCamera();
+      const model = await loadModel();
+      const video = document.getElementById('video');
+      
+      setInterval(() => {
+        predictDepth(model, video);
+      }, 100); // Predict every 100ms
+    }
+
+    start();
+  </script>
+</body>
 </html>
