@@ -1,4 +1,4 @@
-<!doctype html>
+<!-- <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -113,4 +113,74 @@
       document.body.innerHTML += '<button id="toggleButton" onclick="toggleDepthMap()">Показать карту глубины</button>'
     </script>
   </body>
+</html> -->
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Depth Estimation with OpenCV.js</title>
+  <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+</head>
+<body>
+  <h1>Depth Estimation from Camera Stream</h1>
+  <video id="video" width="640" height="480" autoplay></video>
+  <canvas id="depthCanvas" width="640" height="480"></canvas>
+
+  <script>
+    // Инициализация OpenCV.js
+    function onOpenCvReady() {
+      // Получение потока с камеры
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then((stream) => {
+          const video = document.getElementById('video');
+          video.srcObject = stream;
+          video.play();
+        })
+        .catch(err => console.error("Ошибка доступа к камере", err));
+    }
+
+    // Обработка видеопотока для оценки глубины
+    function processVideo() {
+      const video = document.getElementById('video');
+      const canvas = document.getElementById('depthCanvas');
+      const ctx = canvas.getContext('2d');
+
+      // Создание Mat из видеопотока
+      let mat = cv.imread(video);
+      
+      // Конвертация в градации серого (для приблизительной оценки глубины)
+      let gray = new cv.Mat();
+      cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY);
+
+      // Применение фильтра Гаусса для сглаживания
+      let depthMap = new cv.Mat();
+      cv.GaussianBlur(gray, depthMap, new cv.Size(5, 5), 1.5, 1.5);
+
+      // Применение алгоритма Канни для выделения контуров
+      cv.Canny(depthMap, depthMap, 50, 100);
+
+      // Отображение результата на канвасе
+      cv.imshow(canvas, depthMap);
+
+      // Очистка ресурсов
+      mat.delete();
+      gray.delete();
+      depthMap.delete();
+    }
+
+    // Проверка готовности OpenCV.js
+    if (cv.getBuildInformation) {
+      onOpenCvReady();
+      setInterval(processVideo, 100); // Обработка каждые 100 мс
+    } else {
+      console.log("OpenCV.js не готов.");
+    }
+  </script>
+</body>
 </html>
