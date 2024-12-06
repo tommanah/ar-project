@@ -1,157 +1,136 @@
-<!-- <!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AR Depth Map</title>
-    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/depth-estimation@latest/index.js"></script>
-    <style>
-      #depthCanvas {
-        position: fixed;
-        top: 100px;
-        left: 10px;
-        width: 320px;
-        height: 240px;
-        z-index: 1000;
-        display: none;
-      }
-      #toggleButton {
-        position: fixed;
-        top: 10px;
-        left: 10px;
-        z-index: 1001;
-        padding: 10px;
-        background-color: #007bff;
-        color: white;
-        border: none;
-        cursor: pointer;
-      }
-    </style>
-  </head>
-  <body style="margin: 0">
-    <button id="toggleButton" onclick="toggleDepthMap()">Показать карту глубины</button>
-    <canvas id="depthCanvas"></canvas>
-
-    <a-scene embedded arjs="sourceType: webcam;">
-      <a-entity camera></a-entity>
-    </a-scene>
-
-    <script>
-      let depthEstimator;
-      let depthCanvas = document.getElementById("depthCanvas");
-      let depthContext = depthCanvas.getContext("2d");
-      let video;
-
-      async function initializeDepthModel() {
-        const model = depthEstimation.SupportedModels.COCODepthEstimation;
-        depthEstimator = await depthEstimation.createEstimator(model);
-      }
-
-      async function startCamera() {
-        video = document.createElement("video");
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-        video.srcObject = stream;
-        await video.play();
-      }
-
-      async function updateDepthMap() {
-        if (depthEstimator && video.readyState === video.HAVE_ENOUGH_DATA) {
-          const depthMap = await depthEstimator.estimateDepth(video);
-          const depthData = depthMap.dataSync();
-          const width = 320, height = 240;
-          depthCanvas.width = width;
-          depthCanvas.height = height;
-
-          const imageData = depthContext.createImageData(width, height);
-          for (let i = 0; i < depthData.length; i++) {
-            const depthValue = Math.floor((1 - depthData[i]) * 255);
-            imageData.data[i * 4] = depthValue;         // Red
-            imageData.data[i * 4 + 1] = 0;             // Green
-            imageData.data[i * 4 + 2] = 255 - depthValue; // Blue
-            imageData.data[i * 4 + 3] = 255;           // Alpha
-          }
-          depthContext.putImageData(imageData, 0, 0);
-        }
-        requestAnimationFrame(updateDepthMap);
-      }
-
-      async function toggleDepthMap() {
-        if (depthCanvas.style.display === "none") {
-          document.getElementById("toggleButton").innerText = "Скрыть карту глубины";
-          depthCanvas.style.display = "block";
-          if (!video) await startCamera();
-          if (!depthEstimator) await initializeDepthModel();
-          updateDepthMap();
-        } else {
-          document.getElementById("toggleButton").innerText = "Показать карту глубины";
-          depthCanvas.style.display = "none";
-        }
-      }
-    </script>
-  </body>
-</html> -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Depth Estimation with OpenCV4.js</title>
+  <title>Depth Estimation</title>
+  <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/depth-estimation@latest/index.js"></script>
   <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    canvas, video {
+      margin: 10px 0;
+      max-width: 100%;
+    }
+    button {
+      margin: 10px;
+      padding: 10px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:disabled {
+      background-color: #ccc;
+    }
+  </style>
 </head>
 <body>
-  <h1>Depth Estimation from Camera Stream</h1>
-  <video id="video" width="640" height="480" autoplay></video>
-  <canvas id="canvas" width="640" height="480"></canvas>
+  <h1>Depth Estimation</h1>
+  <button id="startWebXR">Start WebXR (AR Depth)</button>
+  <button id="startTensorFlow">Start TensorFlow Depth</button>
+  <button id="startOpenCV">Start OpenCV Depth</button>
+
+  <video id="video" autoplay playsinline></video>
+  <canvas id="canvas"></canvas>
+  <canvas id="depthCanvas" width="320" height="240" style="display: none;"></canvas>
 
   <script>
-    // Initialize OpenCV.js
-    function onOpenCvReady() {
-      // Initialize camera stream
-      navigator.mediaDevices.getUserMedia({ video: true })
-        .then((stream) => {
-          const video = document.getElementById('video');
-          video.srcObject = stream;
-          video.play();
-        })
-        .catch(err => console.error("Camera access denied", err));
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const depthCanvas = document.getElementById('depthCanvas');
+    const ctx = canvas.getContext('2d');
+    const depthCtx = depthCanvas.getContext('2d');
+    let depthEstimator;
+
+    // Check WebXR support
+    async function startWebXR() {
+      if (navigator.xr) {
+        const session = await navigator.xr.requestSession('immersive-ar', {
+          requiredFeatures: ['depth-sensing'],
+          depthSensing: { usagePreference: ['cpu-optimized'], dataFormatPreference: ['luminance-alpha'] },
+        });
+
+        session.addEventListener('end', () => console.log('WebXR session ended.'));
+        console.log('WebXR depth session started.');
+      } else {
+        alert('WebXR not supported on this device.');
+      }
     }
 
-    // Process the video stream to calculate depth
-    function processVideo() {
-      const video = document.getElementById('video');
-      const canvas = document.getElementById('canvas');
-      const ctx = canvas.getContext('2d');
+    // Initialize TensorFlow Depth Model
+    async function startTensorFlow() {
+      depthEstimator = await depthEstimation.createEstimator(depthEstimation.SupportedModels.COCODepthEstimation);
+      console.log('TensorFlow model loaded.');
+      startCamera(video, processDepthWithTensorFlow);
+    }
 
-      // Create OpenCV Mat from video
-      let mat = cv.imread(video);
-      
-      // Convert to grayscale (for depth approximation)
-      let gray = new cv.Mat();
+    async function processDepthWithTensorFlow() {
+      if (depthEstimator && video.readyState >= video.HAVE_ENOUGH_DATA) {
+        const depthMap = await depthEstimator.estimateDepth(video);
+        const depthData = depthMap.dataSync();
+        const width = 320, height = 240;
+        depthCanvas.width = width;
+        depthCanvas.height = height;
+
+        const imageData = depthCtx.createImageData(width, height);
+        for (let i = 0; i < depthData.length; i++) {
+          const depthValue = Math.floor((1 - depthData[i]) * 255);
+          imageData.data[i * 4] = depthValue; // Red
+          imageData.data[i * 4 + 1] = depthValue; // Green
+          imageData.data[i * 4 + 2] = depthValue; // Blue
+          imageData.data[i * 4 + 3] = 255; // Alpha
+        }
+        depthCtx.putImageData(imageData, 0, 0);
+        requestAnimationFrame(processDepthWithTensorFlow);
+      }
+    }
+
+    // OpenCV Depth Estimation
+    function startOpenCV() {
+      startCamera(video, processDepthWithOpenCV);
+    }
+
+    function processDepthWithOpenCV() {
+      const mat = cv.imread(video);
+      const gray = new cv.Mat();
       cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY);
 
-      // Apply edge detection or depth estimation algorithm
-      let depthMap = new cv.Mat();
+      const depthMap = new cv.Mat();
       cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 1.5, 1.5);
       cv.Canny(gray, depthMap, 50, 100);
 
-      // Draw the processed result on the canvas
       cv.imshow(canvas, depthMap);
 
-      // Release resources
       mat.delete();
       gray.delete();
       depthMap.delete();
+
+      requestAnimationFrame(processDepthWithOpenCV);
     }
 
-    // Call the OpenCV ready function
-    if (cv.getBuildInformation) {
-      onOpenCvReady();
-      setInterval(processVideo, 100); // Process every 100 ms
-    } else {
-      console.log("OpenCV.js is not ready yet.");
+    // Utility: Start Camera
+    async function startCamera(videoElement, onReady) {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      videoElement.srcObject = stream;
+      videoElement.onloadedmetadata = () => {
+        videoElement.play();
+        if (onReady) onReady();
+      };
     }
+
+    // Button event listeners
+    document.getElementById('startWebXR').onclick = startWebXR;
+    document.getElementById('startTensorFlow').onclick = startTensorFlow;
+    document.getElementById('startOpenCV').onclick = startOpenCV;
   </script>
 </body>
 </html>
