@@ -121,10 +121,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Depth Estimation with OpenCV.js</title>
-  <script async src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady()"></script>
+  <script src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady()"></script>
 </head>
 <body>
-  <h1>Depth Estimation from Camera Stream1</h1>
+  <h1>Depth Estimation from Camera Stream111</h1>
   <video id="video" width="640" height="480" autoplay></video>
   <canvas id="depthCanvas" width="640" height="480"></canvas>
 
@@ -133,15 +133,20 @@
     let canvasElement;
     let canvasContext;
 
-    // Инициализация OpenCV.js
+    // Функция, которая будет вызвана, когда OpenCV.js загрузится
     function onOpenCvReady() {
-      console.log("OpenCV.js is ready!");
+      if (cv && cv.getBuildInformation) {
+        console.log("OpenCV.js загружен и готов к использованию.");
+      } else {
+        console.error("OpenCV.js не загружен или не готов.");
+        return;
+      }
 
       videoElement = document.getElementById('video');
       canvasElement = document.getElementById('depthCanvas');
       canvasContext = canvasElement.getContext('2d');
 
-      // Получение потока с камеры
+      // Запрашиваем доступ к камере
       navigator.mediaDevices.getUserMedia({ video: true })
         .then((stream) => {
           videoElement.srcObject = stream;
@@ -163,6 +168,7 @@
         return;
       }
 
+      // Проверяем, готов ли видеопоток
       if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
         // Создание Mat из видеопотока
         let mat = cv.imread(videoElement);
@@ -190,4 +196,3 @@
   </script>
 </body>
 </html>
-
