@@ -3,11 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Depth Estimation</title>
-  <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+  <title>Depth Map on Video</title>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/depth-estimation@latest/index.js"></script>
-  <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
   <style>
     body {
       margin: 0;
@@ -15,122 +13,77 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
+      background-color: black;
     }
-    canvas, video {
-      margin: 10px 0;
-      max-width: 100%;
-    }
-    button {
-      margin: 10px;
-      padding: 10px;
-      background-color: #007bff;
-      color: white;
-      border: none;
-      cursor: pointer;
-    }
-    button:disabled {
-      background-color: #ccc;
+    #video, #depthCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: auto;
     }
   </style>
 </head>
 <body>
-  <h1>Depth Estimation</h1>
-  <button id="startWebXR">Start WebXR (AR Depth)</button>
-  <button id="startTensorFlow">Start TensorFlow Depth</button>
-  <button id="startOpenCV">Start OpenCV Depth</button>
-
   <video id="video" autoplay playsinline></video>
-  <canvas id="canvas"></canvas>
-  <canvas id="depthCanvas" width="320" height="240" style="display: none;"></canvas>
+  <canvas id="depthCanvas"></canvas>
 
   <script>
     const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
     const depthCanvas = document.getElementById('depthCanvas');
-    const ctx = canvas.getContext('2d');
     const depthCtx = depthCanvas.getContext('2d');
     let depthEstimator;
 
-    // Check WebXR support
-    async function startWebXR() {
-      if (navigator.xr) {
-        const session = await navigator.xr.requestSession('immersive-ar', {
-          requiredFeatures: ['depth-sensing'],
-          depthSensing: { usagePreference: ['cpu-optimized'], dataFormatPreference: ['luminance-alpha'] },
-        });
+    // Запуск камеры
+    async function startCamera() {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      video.srcObject = stream;
 
-        session.addEventListener('end', () => console.log('WebXR session ended.'));
-        console.log('WebXR depth session started.');
-      } else {
-        alert('WebXR not supported on this device.');
-      }
+      // Ожидаем загрузки видео
+      video.onloadedmetadata = () => {
+        video.play();
+        depthCanvas.width = video.videoWidth;
+        depthCanvas.height = video.videoHeight;
+        initializeDepthModel();
+      };
     }
 
-    // Initialize TensorFlow Depth Model
-    async function startTensorFlow() {
-      depthEstimator = await depthEstimation.createEstimator(depthEstimation.SupportedModels.COCODepthEstimation);
-      console.log('TensorFlow model loaded.');
-      startCamera(video, processDepthWithTensorFlow);
+    // Инициализация модели TensorFlow
+    async function initializeDepthModel() {
+      depthEstimator = await depthEstimation.createEstimator(
+        depthEstimation.SupportedModels.COCODepthEstimation
+      );
+      console.log('Depth model loaded');
+      processVideo();
     }
 
-    async function processDepthWithTensorFlow() {
+    // Обработка видео и отрисовка карты глубины
+    async function processVideo() {
       if (depthEstimator && video.readyState >= video.HAVE_ENOUGH_DATA) {
+        // Генерация карты глубины
         const depthMap = await depthEstimator.estimateDepth(video);
         const depthData = depthMap.dataSync();
-        const width = 320, height = 240;
-        depthCanvas.width = width;
-        depthCanvas.height = height;
+        const width = depthCanvas.width;
+        const height = depthCanvas.height;
 
+        // Подготовка пикселей для отрисовки
         const imageData = depthCtx.createImageData(width, height);
         for (let i = 0; i < depthData.length; i++) {
           const depthValue = Math.floor((1 - depthData[i]) * 255);
           imageData.data[i * 4] = depthValue; // Red
           imageData.data[i * 4 + 1] = depthValue; // Green
           imageData.data[i * 4 + 2] = depthValue; // Blue
-          imageData.data[i * 4 + 3] = 255; // Alpha
+          imageData.data[i * 4 + 3] = 150; // Alpha (прозрачность)
         }
         depthCtx.putImageData(imageData, 0, 0);
-        requestAnimationFrame(processDepthWithTensorFlow);
       }
+
+      // Продолжаем обработку
+      requestAnimationFrame(processVideo);
     }
 
-    // OpenCV Depth Estimation
-    function startOpenCV() {
-      startCamera(video, processDepthWithOpenCV);
-    }
-
-    function processDepthWithOpenCV() {
-      const mat = cv.imread(video);
-      const gray = new cv.Mat();
-      cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY);
-
-      const depthMap = new cv.Mat();
-      cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 1.5, 1.5);
-      cv.Canny(gray, depthMap, 50, 100);
-
-      cv.imshow(canvas, depthMap);
-
-      mat.delete();
-      gray.delete();
-      depthMap.delete();
-
-      requestAnimationFrame(processDepthWithOpenCV);
-    }
-
-    // Utility: Start Camera
-    async function startCamera(videoElement, onReady) {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      videoElement.srcObject = stream;
-      videoElement.onloadedmetadata = () => {
-        videoElement.play();
-        if (onReady) onReady();
-      };
-    }
-
-    // Button event listeners
-    document.getElementById('startWebXR').onclick = startWebXR;
-    document.getElementById('startTensorFlow').onclick = startTensorFlow;
-    document.getElementById('startOpenCV').onclick = startOpenCV;
+    // Запуск приложения
+    startCamera().catch(err => console.error('Error accessing camera:', err));
   </script>
 </body>
 </html>
