@@ -1,89 +1,183 @@
-<!DOCTYPE html>
+<!-- <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Depth Map on Video</title>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/depth-estimation@latest/index.js"></script>
-  <style>
-    body {
-      margin: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background-color: black;
-    }
-    #video, #depthCanvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: auto;
-    }
-  </style>
-</head>
-<body>
-  <video id="video" autoplay playsinline></video>
-  <canvas id="depthCanvas"></canvas>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Depth Map on Video</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/depth-estimation@2.0.0/dist/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <style>
+      body {
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background-color: black;
+      }
+      #video,
+      #depthCanvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <video id="video" autoplay playsinline></video>
+    <canvas id="depthCanvas"></canvas>
 
-  <script>
-    const video = document.getElementById('video');
-    const depthCanvas = document.getElementById('depthCanvas');
-    const depthCtx = depthCanvas.getContext('2d');
-    let depthEstimator;
+    <script>
+      const video = document.getElementById("video");
+      const depthCanvas = document.getElementById("depthCanvas");
+      const depthCtx = depthCanvas.getContext("2d");
+      let depthEstimator;
+      async function toggleDepthMap() {
+        if (depthCanvas.style.display === "none") {
+          document.getElementById("toggleButton").innerText =
+            "Скрыть карту глубины";
+          depthCanvas.style.display = "block";
+          if (!video) await startCamera();
 
-    // Запуск камеры
-    async function startCamera() {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      video.srcObject = stream;
-
-      // Ожидаем загрузки видео
-      video.onloadedmetadata = () => {
-        video.play();
-        depthCanvas.width = video.videoWidth;
-        depthCanvas.height = video.videoHeight;
-        initializeDepthModel();
-      };
-    }
-
-    // Инициализация модели TensorFlow
-    async function initializeDepthModel() {
-      depthEstimator = await depthEstimation.createEstimator(
-        depthEstimation.SupportedModels.COCODepthEstimation
-      );
-      console.log('Depth model loaded');
-      processVideo();
-    }
-
-    // Обработка видео и отрисовка карты глубины
-    async function processVideo() {
-      if (depthEstimator && video.readyState >= video.HAVE_ENOUGH_DATA) {
-        // Генерация карты глубины
-        const depthMap = await depthEstimator.estimateDepth(video);
-        const depthData = depthMap.dataSync();
-        const width = depthCanvas.width;
-        const height = depthCanvas.height;
-
-        // Подготовка пикселей для отрисовки
-        const imageData = depthCtx.createImageData(width, height);
-        for (let i = 0; i < depthData.length; i++) {
-          const depthValue = Math.floor((1 - depthData[i]) * 255);
-          imageData.data[i * 4] = depthValue; // Red
-          imageData.data[i * 4 + 1] = depthValue; // Green
-          imageData.data[i * 4 + 2] = depthValue; // Blue
-          imageData.data[i * 4 + 3] = 150; // Alpha (прозрачность)
+          // Проверяем, загружена ли библиотека
+          if (typeof depthEstimation !== "undefined") {
+            if (!depthEstimator) await initializeDepthModel();
+            updateDepthMap();
+          } else {
+            console.error(
+              "depthEstimation не найден. Убедитесь, что библиотека правильно загружена.",
+            );
+          }
+        } else {
+          document.getElementById("toggleButton").innerText =
+            "Показать карту глубины";
+          depthCanvas.style.display = "none";
         }
-        depthCtx.putImageData(imageData, 0, 0);
+      }
+      // Запуск камеры
+      async function startCamera() {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
+        });
+        video.srcObject = stream;
+
+        // Ожидаем загрузки видео
+        video.onloadedmetadata = () => {
+          video.play();
+          depthCanvas.width = video.videoWidth;
+          depthCanvas.height = video.videoHeight;
+          initializeDepthModel();
+        };
       }
 
-      // Продолжаем обработку
-      requestAnimationFrame(processVideo);
-    }
+      // Инициализация модели TensorFlow
+      async function initializeDepthModel() {
+        depthEstimator = await depthEstimation.createEstimator(
+          depthEstimation.SupportedModels.COCODepthEstimation,
+        );
+        console.log("Depth model loaded");
+        processVideo();
+      }
 
-    // Запуск приложения
-    startCamera().catch(err => console.error('Error accessing camera:', err));
-  </script>
-</body>
+      // Обработка видео и отрисовка карты глубины
+      async function processVideo() {
+        if (depthEstimator && video.readyState >= video.HAVE_ENOUGH_DATA) {
+          // Генерация карты глубины
+          const depthMap = await depthEstimator.estimateDepth(video);
+          const depthData = depthMap.dataSync();
+          const width = depthCanvas.width;
+          const height = depthCanvas.height;
+
+          // Подготовка пикселей для отрисовки
+          const imageData = depthCtx.createImageData(width, height);
+          for (let i = 0; i < depthData.length; i++) {
+            const depthValue = Math.floor((1 - depthData[i]) * 255);
+            imageData.data[i * 4] = depthValue; // Red
+            imageData.data[i * 4 + 1] = depthValue; // Green
+            imageData.data[i * 4 + 2] = depthValue; // Blue
+            imageData.data[i * 4 + 3] = 150; // Alpha (прозрачность)
+          }
+          depthCtx.putImageData(imageData, 0, 0);
+        }
+
+        // Продолжаем обработку
+        requestAnimationFrame(processVideo);
+      }
+
+      // Запуск приложения
+      startCamera().catch((err) =>
+        console.error("Error accessing camera:", err),
+      );
+      document.body.innerHTML += '<button id="toggleButton" onclick="toggleDepthMap()">Показать карту глубины</button>'
+    </script>
+  </body>
+</html> -->
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Depth Estimation with OpenCV.js</title>
+    <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+  </head>
+  <body>
+    <h1>Depth Estimation from Camera Stream</h1>
+    <video id="video" width="640" height="480" autoplay></video>
+    <canvas id="depthCanvas" width="640" height="480"></canvas>
+
+    <script>
+      // Инициализация OpenCV.js
+      function onOpenCvReady() {
+        // Получение потока с камеры
+        navigator.mediaDevices
+          .getUserMedia({ video: true })
+          .then((stream) => {
+            const video = document.getElementById("video");
+            video.srcObject = stream;
+            video.play();
+          })
+          .catch((err) => console.error("Ошибка доступа к камере", err));
+      }
+
+      // Обработка видеопотока для оценки глубины
+      function processVideo() {
+        const video = document.getElementById("video");
+        const canvas = document.getElementById("depthCanvas");
+        const ctx = canvas.getContext("2d");
+
+        // Создание Mat из видеопотока
+        let mat = cv.imread(video);
+
+        // Конвертация в градации серого (для приблизительной оценки глубины)
+        let gray = new cv.Mat();
+        cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY);
+
+        // Применение фильтра Гаусса для сглаживания
+        let depthMap = new cv.Mat();
+        cv.GaussianBlur(gray, depthMap, new cv.Size(5, 5), 1.5, 1.5);
+
+        // Применение алгоритма Канни для выделения контуров
+        cv.Canny(depthMap, depthMap, 50, 100);
+
+        // Отображение результата на канвасе
+        cv.imshow(canvas, depthMap);
+
+        // Очистка ресурсов
+        mat.delete();
+        gray.delete();
+        depthMap.delete();
+      }
+
+      // Проверка готовности OpenCV.js
+      if (cv.getBuildInformation) {
+        onOpenCvReady();
+        setInterval(processVideo, 100); // Обработка каждые 100 мс
+      } else {
+        console.log("OpenCV.js не готов.");
+      }
+    </script>
+  </body>
 </html>
