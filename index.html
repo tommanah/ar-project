@@ -120,21 +120,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Depth Estimation with OpenCV.js</title>
-    <script>
-      function onOpenCvReady() {
-        console.log("OpenCV Ready", cv);
-      }
-    </script>
-    <script
-      async
-      src="https://cdn.jsdelivr.net/npm/opencv.js"
-      onload="onOpenCvReady();"
-      type="text/javascript"
-    ></script>
+    <title>1 Depth Estimation with OpenCV.js</title>
+    <script async src="https://cdn.jsdelivr.net/npm/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
   </head>
   <body>
-    <h1>Depth Estimation from Camera Stream111</h1>
+    <h1>Depth Estimation from Camera Stream</h1>
     <video id="video" width="640" height="480" autoplay></video>
     <canvas id="depthCanvas" width="640" height="480"></canvas>
 
@@ -142,6 +132,8 @@
       let videoElement;
       let canvasElement;
       let canvasContext;
+      let mat;
+      let thresholdMat;
 
       // Функция, которая будет вызвана, когда OpenCV.js загрузится
       function onOpenCvReady() {
@@ -184,7 +176,7 @@
         // Проверяем, готов ли видеопоток
         if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
           // Создание Mat из видеопотока
-          let mat = cv.imread(videoElement);
+          mat = cv.imread(videoElement);
 
           // Конвертация в градации серого (для приблизительной оценки глубины)
           let gray = new cv.Mat();
@@ -194,16 +186,18 @@
           let depthMap = new cv.Mat();
           cv.GaussianBlur(gray, depthMap, new cv.Size(5, 5), 1.5, 1.5);
 
-          // Применение алгоритма Канни для выделения контуров
-          cv.Canny(depthMap, depthMap, 50, 100);
+          // Применение пороговой обработки
+          thresholdMat = new cv.Mat();
+          cv.threshold(depthMap, thresholdMat, 100, 255, cv.THRESH_BINARY);
 
           // Отображение результата на канвасе
-          cv.imshow("depthCanvas", depthMap);
+          cv.imshow("depthCanvas", thresholdMat);
 
           // Очистка ресурсов
           mat.delete();
           gray.delete();
           depthMap.delete();
+          thresholdMat.delete();
         }
       }
     </script>
