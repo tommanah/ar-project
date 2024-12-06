@@ -124,21 +124,28 @@
   <script async src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady()"></script>
 </head>
 <body>
-  <h1>Depth Estimation from Camera Stream</h1>
+  <h1>Depth Estimation from Camera Stream1</h1>
   <video id="video" width="640" height="480" autoplay></video>
   <canvas id="depthCanvas" width="640" height="480"></canvas>
 
   <script>
+    let videoElement;
+    let canvasElement;
+    let canvasContext;
+
     // Инициализация OpenCV.js
     function onOpenCvReady() {
       console.log("OpenCV.js is ready!");
 
+      videoElement = document.getElementById('video');
+      canvasElement = document.getElementById('depthCanvas');
+      canvasContext = canvasElement.getContext('2d');
+
       // Получение потока с камеры
       navigator.mediaDevices.getUserMedia({ video: true })
         .then((stream) => {
-          const video = document.getElementById('video');
-          video.srcObject = stream;
-          video.play();
+          videoElement.srcObject = stream;
+          videoElement.play();
         })
         .catch(err => {
           console.error("Ошибка доступа к камере", err);
@@ -151,37 +158,34 @@
 
     // Обработка видеопотока для оценки глубины
     function processVideo() {
-      const video = document.getElementById('video');
-      const canvas = document.getElementById('depthCanvas');
-      const ctx = canvas.getContext('2d');
-
-      // Убедимся, что OpenCV готов
       if (typeof cv === 'undefined') {
         console.error('OpenCV.js не загружен');
         return;
       }
 
-      // Создание Mat из видеопотока
-      let mat = cv.imread(video);
+      if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
+        // Создание Mat из видеопотока
+        let mat = cv.imread(videoElement);
 
-      // Конвертация в градации серого (для приблизительной оценки глубины)
-      let gray = new cv.Mat();
-      cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY);
+        // Конвертация в градации серого (для приблизительной оценки глубины)
+        let gray = new cv.Mat();
+        cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY);
 
-      // Применение фильтра Гаусса для сглаживания
-      let depthMap = new cv.Mat();
-      cv.GaussianBlur(gray, depthMap, new cv.Size(5, 5), 1.5, 1.5);
+        // Применение фильтра Гаусса для сглаживания
+        let depthMap = new cv.Mat();
+        cv.GaussianBlur(gray, depthMap, new cv.Size(5, 5), 1.5, 1.5);
 
-      // Применение алгоритма Канни для выделения контуров
-      cv.Canny(depthMap, depthMap, 50, 100);
+        // Применение алгоритма Канни для выделения контуров
+        cv.Canny(depthMap, depthMap, 50, 100);
 
-      // Отображение результата на канвасе
-      cv.imshow(canvas, depthMap);
+        // Отображение результата на канвасе
+        cv.imshow('depthCanvas', depthMap);
 
-      // Очистка ресурсов
-      mat.delete();
-      gray.delete();
-      depthMap.delete();
+        // Очистка ресурсов
+        mat.delete();
+        gray.delete();
+        depthMap.delete();
+      }
     }
   </script>
 </body>
