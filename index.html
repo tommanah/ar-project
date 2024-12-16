@@ -323,7 +323,7 @@
 </body>
 </html> -->
 
-<!DOCTYPE html>
+<!-- <!DOCTYPE html> -->
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -369,3 +369,112 @@
 </body>
 </html>
 
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR Sphere without Markers</title>
+
+    <!-- Подключаем A-Frame -->
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://cdn.rawgit.com/jeromeetienne/AR.js/2.1.4/aframe/build/aframe-ar.js"></script>
+  </head>
+  <body style="margin: 0">
+
+    <!-- Кнопка для запуска камеры и сенсоров -->
+    <button onclick="toggleCameraAndSensors()" style="position: fixed; top: 10px; left: 10px; z-index: 1000;">Toggle Camera and Sensors</button>
+
+    <!-- Мини-меню для отображения данных сенсоров -->
+    <div id="sensorData" style="position: fixed; top: 50px; left: 10px; background: rgba(255, 255, 255, 0.8); padding: 10px; z-index: 1000; display: none;">
+      <h3>Sensor Data</h3>
+      <p><strong>Accelerometer:</strong></p>
+      <p>x: <span id="accelX">0</span></p>
+      <p>y: <span id="accelY">0</span></p>
+      <p>z: <span id="accelZ">0</span></p>
+      <p><strong>Gyroscope:</strong></p>
+      <p>alpha: <span id="gyroAlpha">0</span></p>
+      <p>beta: <span id="gyroBeta">0</span></p>
+      <p>gamma: <span id="gyroGamma">0</span></p>
+    </div>
+
+    <a-scene>
+      <a-entity camera></a-entity>
+      <a-entity id="heatmap" visible="false"></a-entity>
+    </a-scene>
+    
+    <script>
+      let sensorsActive = false;
+      let accelerometer, gyroscope;
+
+      function toggleCameraAndSensors() {
+        sensorsActive = !sensorsActive;
+        document.getElementById('sensorData').style.display = sensorsActive ? 'block' : 'none';
+
+        if (sensorsActive) {
+          startCamera();
+          startSensors();
+        } else {
+          stopCamera();
+          stopSensors();
+        }
+      }
+
+      function startCamera() {
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+          .then(stream => {
+            const video = document.createElement('video');
+            video.srcObject = stream;
+            video.play();
+          })
+          .catch(error => {
+            console.error("Ошибка доступа к камере:", error);
+          });
+      }
+
+      function stopCamera() {
+        // Здесь можно добавить логику для остановки камеры, если необходимо
+      }
+
+      function startSensors() {
+        // Проверяем наличие сенсоров
+        if (typeof DeviceMotionEvent.requestPermission === 'function') {
+          DeviceMotionEvent.requestPermission().then(response => {
+            if (response === 'granted') {
+              window.addEventListener('devicemotion', handleMotionEvent);
+            }
+          }).catch(console.error);
+        } else {
+          window.addEventListener('devicemotion', handleMotionEvent);
+        }
+
+        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+          DeviceOrientationEvent.requestPermission().then(response => {
+            if (response === 'granted') {
+              window.addEventListener('deviceorientation', handleOrientationEvent);
+            }
+          }).catch(console.error);
+        } else {
+          window.addEventListener('deviceorientation', handleOrientationEvent);
+        }
+      }
+
+      function stopSensors() {
+        window.removeEventListener('devicemotion', handleMotionEvent);
+        window.removeEventListener('deviceorientation', handleOrientationEvent);
+      }
+
+      function handleMotionEvent(event) {
+        document.getElementById('accelX').textContent = event.acceleration.x.toFixed(2);
+        document.getElementById('accelY').textContent = event.acceleration.y.toFixed(2);
+        document.getElementById('accelZ').textContent = event.acceleration.z.toFixed(2);
+      }
+
+      function handleOrientationEvent(event) {
+        document.getElementById('gyroAlpha').textContent = event.alpha ? event.alpha.toFixed(2) : 0;
+        document.getElementById('gyroBeta').textContent = event.beta ? event.beta.toFixed(2) : 0;
+        document.getElementById('gyroGamma').textContent = event.gamma ? event.gamma.toFixed(2) : 0;
+      }
+    </script>
+  </body>
+</html>
