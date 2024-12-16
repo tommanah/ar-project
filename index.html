@@ -439,11 +439,11 @@
           if (permissionState === 'granted') {
             window.addEventListener('devicemotion', handleMotionEvent);
           } else {
-            console.warn('Доступ к акселерометру не предоставлен.');
+            alert('Доступ к акселерометру не предоставлен.');
           }
         })
         .catch(error => {
-          console.error('Ошибка при запросе разрешения на акселерометр:', error);
+          alert('Ошибка при запросе разрешения на акселерометр:', error);
         });
     } else {
       window.addEventListener('devicemotion', handleMotionEvent);
@@ -455,11 +455,11 @@
           if (permissionState === 'granted') {
             window.addEventListener('deviceorientation', handleOrientationEvent);
           } else {
-            console.warn('Доступ к гироскопу не предоставлен.');
+            alert('Доступ к гироскопу не предоставлен.');
           }
         })
         .catch(error => {
-          console.error('Ошибка при запросе разрешения на гироскоп:', error);
+          alert('Ошибка при запросе разрешения на гироскоп:', error);
         });
     } else {
       window.addEventListener('deviceorientation', handleOrientationEvent);
