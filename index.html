@@ -1,134 +1,248 @@
-<!DOCTYPE html>
-<html lang="en">
+
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR Sphere without Markers</title>
-    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-    <script src="https://cdn.rawgit.com/jeromeetienne/AR.js/2.1.4/aframe/build/aframe-ar.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+	<title>Show What Information is Being Sensed in the World</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<style>
+		body, html {
+			padding: 0;
+			margin: 0;
+			overflow: hidden;
+			position: fixed;
+			width: 100%;
+			height: 100vh;
+			-webkit-user-select: none;
+			user-select: none;
+		}
+        #gui { position: absolute; top: 5%; right: 2px }
+		#target {
+			width: 100%;
+			height: 100%;
+			position: absolute;
+		}
+	</style>
+	<link rel="stylesheet" href="../common.css"/>
+	<script src="../libs/three.js"></script>
+	<script src="../libs/three-gltf-loader.js"></script>
+<!--    
+        <script type="module" src="../../polyfill/XRPolyfill.js"></script>
+        <script nomodule src="../../dist/webxr-polyfill.js"></script>
+ -->        
+        <script src="../../dist/webxr-polyfill.js"></script>
+	<script src="../common.js"></script>
 </head>
-<body style="margin: 0">
+<body>
+<div id="target" />
+<div onclick="hideMe(this)" id="description">
+	<h2>Show World Knowledge</h2>
+	<h5>(click to dismiss)</h5>
+	<p>Render the anchors, including planes and face geometry, detected by the platform.
+    </p>
+</div>
+<script>
+    
+    class WorldKnowledgeExample extends XRExampleBase {
+        constructor(domElement){
+            super(domElement, false, true, false, true)
 
-    <button onclick="toggleCameraAndSensors()" style="position: fixed; top: 10px; left: 10px; z-index: 1000;">Toggle Camera and Sensors</button>
+            // A message at the bottom of the screen that shows whether a surface has been found
+            this._messageEl = document.createElement('div')
+            this.el.appendChild(this._messageEl)
+            this._messageEl.style.position = 'absolute'
+            this._messageEl.style.bottom = '10px'
+            this._messageEl.style.left = '10px'
+            this._messageEl.style.color = 'white'
+            this._messageEl.style['font-size'] = '16px'
 
-    <div id="sensorData" style="position: fixed; top: 50px; left: 10px; background: rgba(255, 255, 255, 0.8); padding: 10px; z-index: 1000; display: none;">
-      <h3>Sensor Data</h3>
-      <p><strong>Accelerometer:</strong></p>
-      <p>x: <span id="accelX">0</span></p>
-      <p>y: <span id="accelY">0</span></p>
-      <p>z: <span id="accelZ">0</span></p>
-      <p><strong>Gyroscope:</strong></p>
-      <p>alpha: <span id="gyroAlpha">0</span></p>
-      <p>beta: <span id="gyroBeta">0</span></p>
-      <p>gamma: <span id="gyroGamma">0</span></p>
-    </div>
-
-    <a-scene>
-      <a-entity camera></a-entity>
-      <a-entity id="heatmap" visible="false"></a-entity>
-    </a-scene>
-
-    <script>
-      let sensorsActive = false;
-      let accelerometer, gyroscope;
-      let scene, camera, renderer, plane;
-
-      function toggleCameraAndSensors() {
-        sensorsActive = !sensorsActive;
-        document.getElementById('sensorData').style.display = sensorsActive ? 'block' : 'none';
-
-        if (sensorsActive) {
-          startCamera();
-          startSensors();
-          init3DScene();
-        } else {
-          stopCamera();
-          stopSensors();
+            this.anchorMap = new Map()
         }
-      }
 
-      function startCamera() {
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-          .then(stream => {
-            const video = document.createElement('video');
-            video.srcObject = stream;
-            video.play();
-          })
-          .catch(error => {
-            console.error("Ошибка доступа к камере:", error);
-          });
-      }
+        // Called during construction to allow the app to populate this.scene
+        initializeScene() {
+            // Add a box at the scene origin
+            let box = new THREE.Mesh(
+                new THREE.BoxBufferGeometry(0.1, 0.1, 0.1),
+                new THREE.MeshPhongMaterial({color: '#DDFFDD'})
+            )
+            box.position.set(0, 0.05, 0)
+            var axesHelper = AxesHelper( 0.2 );
+            this.floorGroup.add( axesHelper );
+            this.floorGroup.add(box)
 
-      function stopCamera() {
-        // Здесь можно добавить логику для остановки камеры, если необходимо
-      }
+            // Add a few lights
+            this.ambientLight = new THREE.AmbientLight('#FFF', 0.2)
+            this.scene.add(this.ambientLight);
 
-      function startSensors() {
-        if (typeof DeviceMotionEvent.requestPermission === 'function') {
-          DeviceMotionEvent.requestPermission().then(response => {
-            if (response === 'granted') {
-              window.addEventListener('devicemotion', handleMotionEvent);
+            this.directionalLight = new THREE.DirectionalLight('#FFF', 0.6)
+            this.directionalLight.position.set(0, 10, 0)
+            this.scene.add(this.directionalLight)
+
+			this.listenerSetup = false
+        }
+
+        // Called once per frame, before render, to give the app a chance to update this.scene
+        updateScene(frame){
+            if(frame.hasLightEstimate){
+                // intensity is 1 for "normal"
+                this.ambientLight.intensity = frame.lightEstimate * (2/10);
+                this.directionalLight.intensity = frame.lightEstimate * (8/10);
             }
-          }).catch(console.error);
-        } else {
-          window.addEventListener('devicemotion', handleMotionEvent);
-        }
-
-        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-          DeviceOrientationEvent.requestPermission().then(response => {
-            if (response === 'granted') {
-              window.addEventListener('deviceorientation', handleOrientationEvent);
+            if (!this.listenerSetup) {
+                this.listenerSetup = true
+                this.session.addEventListener(XRSession.NEW_WORLD_ANCHOR, this._handleNewWorldAnchor.bind(this))
+                this.session.addEventListener(XRSession.UPDATE_WORLD_ANCHOR, this._handleUpdateWorldAnchor.bind(this))
+                this.session.addEventListener(XRSession.REMOVE_WORLD_ANCHOR, this._handleRemoveWorldAnchor.bind(this))
+                
             }
-          }).catch(console.error);
-        } else {
-          window.addEventListener('deviceorientation', handleOrientationEvent);
         }
-      }
 
-      function stopSensors() {
-        window.removeEventListener('devicemotion', handleMotionEvent);
-        window.removeEventListener('deviceorientation', handleOrientationEvent);
-      }
+        _handleUpdateWorldAnchor(event) {
+            let anchor = event.detail
 
-      function handleMotionEvent(event) {
-        document.getElementById('accelX').textContent = event.acceleration.x.toFixed(2);
-        document.getElementById('accelY').textContent = event.acceleration.y.toFixed(2);
-        document.getElementById('accelZ').textContent = event.acceleration.z.toFixed(2);
-      }
+            if (anchor instanceof XRFaceAnchor) {
+                if (anchor.geometry !== null) {
+                    if (anchor.mesh) {
+                        let currentVertexIndex = 0
+                        var position = anchor.mesh.geometry.attributes.position;                    
+                        for (let vertex of anchor.geometry.vertices) {
+                            position.setXYZ(currentVertexIndex++, vertex.x, vertex.y, vertex.z)
+                        }
 
-      function handleOrientationEvent(event) {
-        document.getElementById('gyroAlpha').textContent = event.alpha ? event.alpha.toFixed(2) : 0;
-        document.getElementById('gyroBeta').textContent = event.beta ? event.beta.toFixed(2) : 0;
-        document.getElementById('gyroGamma').textContent = event.gamma ? event.gamma.toFixed(2) : 0;
+                        //this.faceMesh.geometry.verticesNeedUpdate = true;
+                        position.needsUpdate = true;                            
+                    } else {
+                        mesh = this.newMeshNode(anchor, '#999999', '#999900')
+                        if (mesh) {
+                            anchor.node.add(mesh)
+                        }
+                    }
+                }
+            } else if (anchor instanceof XRPlaneAnchor) {
+                if (anchor.geometry !== null) {
+                    if (anchor.mesh) {
+                        if  ((anchor.mesh.extent[0] != anchor.extent[0]) || (anchor.mesh.extent[1] != anchor.extent[1])) {
+                            // assume that any change to the plane will results in the extent changing at least a little
+                            anchor.node.remove(anchor.mesh)
 
-        if (plane) {
-          plane.rotation.x = THREE.MathUtils.degToRad(event.beta || 0);
-          plane.rotation.y = THREE.MathUtils.degToRad(event.gamma || 0);
-          plane.rotation.z = THREE.MathUtils.degToRad(event.alpha || 0);
+                            let mesh = this.newMeshNode(anchor, '#11FF11', '#009900')
+                            if (mesh) {
+                                mesh.extent = [anchor.extent[0], anchor.extent[1]]
+                                anchor.node.add(mesh)
+                            }
+                        }
+                    } else {
+                        mesh = this.newMeshNode(anchor, '#11FF11', '#009900')
+                        if (mesh) {
+                            mesh.extent = [anchor.extent[0], anchor.extent[1]]
+                        }
+                    }
+                }
+            }
+		}
+
+        _handleRemoveWorldAnchor(event) {
+            let anchor = event.detail
+            if (anchor.node !== null) {
+                this.removeAnchoredNode(anchor.node);
+            }                
         }
-      }
 
-      function init3DScene() {
-        scene = new THREE.Scene();
-        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        renderer = new THREE.WebGLRenderer();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
+        _handleNewWorldAnchor(event) {
+            let anchor = event.detail
+            let anchorGroup = new THREE.Group();
+            var mesh = null;
 
-        const geometry = new THREE.PlaneGeometry(1, 1);
-        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide });
-        plane = new THREE.Mesh(geometry, material);
-        scene.add(plane);
+	      	if (anchor instanceof XRFaceAnchor) {
+                mesh = this.newMeshNode(anchor, '#999999', '#999900')
+            } else if (anchor instanceof XRPlaneAnchor) {
+                mesh = this.newMeshNode(anchor, '#11FF11', '#009900')
+                if (mesh) {
+                    mesh.extent = [anchor.extent[0], anchor.extent[1]]
+                }
+            }
+            if (mesh) {
+                anchorGroup.add(mesh)
+            }
+            var axesHelper = AxesHelper( 0.1 );
+            anchorGroup.add( axesHelper );
+            anchor.node = anchorGroup;
+            this.addAnchoredNode(new XRAnchorOffset(anchor.uid), anchorGroup)
+		}
 
-        camera.position.z = 5;
+        newMeshNode(anchor, edgeColor, polyColor) {
+	      	if (anchor instanceof XRFaceAnchor || anchor instanceof XRPlaneAnchor) {
+                if (anchor.geometry !== null) {
+                    let mesh = new THREE.Group();
 
-        function animate() {
-          requestAnimationFrame(animate);
-          renderer.render(scene, camera);
-        }
-        animate();
-      }
-    </script>
+                    let vertexCount = anchor.geometry.vertexCount
+                    let vertices = new Float32Array( vertexCount * 3 );
+                    let currentVertexIndex = 0
+                    for (let vertex of anchor.geometry.vertices) {
+                        vertices[currentVertexIndex++] = vertex.x
+                        vertices[currentVertexIndex++] = vertex.y
+                        vertices[currentVertexIndex++] = vertex.z
+                    }
+                    
+                    let triangleIndices = anchor.geometry.triangleIndices
+                    let verticesBufferAttribute = new THREE.BufferAttribute( vertices, 3 )
+                    verticesBufferAttribute.dynamic = true
+
+                    let geometry = new THREE.BufferGeometry()
+                    geometry.addAttribute( 'position', verticesBufferAttribute );
+                    geometry.setIndex(triangleIndices)
+
+                    // transparent mesh
+                    var wireMaterial = new THREE.MeshPhongMaterial({color: edgeColor, wireframe: true})
+                    var material = new THREE.MeshPhongMaterial({color: polyColor, transparent: true, opacity: 0.25})
+
+                    mesh.add(new THREE.Mesh(geometry, material))
+                    mesh.add(new THREE.Mesh(geometry, wireMaterial))
+
+                    mesh.geometry = geometry;  // for later use
+
+                    anchor.mesh = mesh;
+                    return mesh
+                }
+            }
+            return null;
+		}
+   }
+
+    function AxesHelper( size ) {
+        size = size || 1;
+
+        var vertices = [
+            0, 0, 0,	size, 0, 0,
+            0, 0, 0,	0, size, 0,
+            0, 0, 0,	0, 0, size
+        ];
+
+        var colors = [
+            1, 0, 0,	1, 0.6, 0,
+            0, 1, 0,	0.6, 1, 0,
+            0, 0, 1,	0, 0.6, 1
+        ];
+
+        var geometry = new THREE.BufferGeometry();
+        geometry.addAttribute( 'position', new THREE.Float32BufferAttribute( vertices, 3 ) );
+        geometry.addAttribute( 'color', new THREE.Float32BufferAttribute( colors, 3 ) );
+
+        var material = new THREE.LineBasicMaterial( { vertexColors: THREE.VertexColors } );
+
+        return new THREE.LineSegments(geometry, material);
+    }
+
+
+    window.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+            try {
+                window.pageApp = new WorldKnowledgeExample(document.getElementById('target'))
+            } catch(e) {
+                console.error('page error', e)
+            }
+        }, 1000)
+    })
+</script>
 </body>
 </html>
