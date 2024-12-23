@@ -1,90 +1,53 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebXR Plane Sensing</title>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/webxr-polyfill@latest/build/webxr-polyfill.min.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Наклон плоскости</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background-color: #202020;
+    }
+    .plane {
+      width: 200px;
+      height: 200px;
+      background-color: #3498db;
+      transform-style: preserve-3d;
+      transform-origin: center;
+      transition: transform 0.1s linear;
+    }
+  </style>
 </head>
-<body style="margin: 0; overflow: hidden;">
-    <div id="info" style="position: absolute; top: 10px; left: 10px; z-index: 10; color: white;"></div>
+<body>
+  <div class="plane"></div>
 
-    <script>
-        // Подключаем WebXR Polyfill
-        const polyfill = new WebXRPolyfill();
+  <script>
+    const plane = document.querySelector('.plane');
 
-        // Основная сцена Three.js
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(
-            75,
-            window.innerWidth / window.innerHeight,
-            0.1,
-            1000
-        );
+    // Функция для обработки события ориентации устройства
+    function handleOrientation(event) {
+      const { beta, gamma } = event; // beta - наклон вперед/назад, gamma - наклон влево/вправо
 
-        const renderer = new THREE.WebGLRenderer();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
+      // Ограничим значения углов для стабильности
+      const limitedBeta = Math.max(-90, Math.min(90, beta));
+      const limitedGamma = Math.max(-45, Math.min(45, gamma));
 
-        // Создаём свет
-        const light = new THREE.PointLight(0xffffff, 1, 100);
-        light.position.set(5, 5, 5);
-        scene.add(light);
+      // Устанавливаем вращение плоскости
+      plane.style.transform = `rotateX(${limitedBeta}deg) rotateY(${limitedGamma}deg)`;
+    }
 
-        // Плоскости
-        const planes = [];
-        for (let i = 0; i < 5; i++) {
-            const geometry = new THREE.PlaneGeometry(1, 1);
-            const material = new THREE.MeshBasicMaterial({
-                color: Math.random() * 0xffffff,
-                side: THREE.DoubleSide,
-            });
-            const plane = new THREE.Mesh(geometry, material);
-            plane.position.set(Math.random() * 4 - 2, Math.random() * 4 - 2, -Math.random() * 4);
-            planes.push(plane);
-            scene.add(plane);
-        }
-
-        // Обновление плоскостей с данными сенсоров
-        function updatePlanesWithSensors(event) {
-            const { alpha, beta, gamma } = event;
-
-            // Преобразуем углы для всех плоскостей
-            planes.forEach((plane, index) => {
-                plane.rotation.x = THREE.MathUtils.degToRad(beta);
-                plane.rotation.y = THREE.MathUtils.degToRad(gamma);
-                plane.rotation.z = THREE.MathUtils.degToRad(alpha);
-            });
-        }
-
-        // Доступ к данным гироскопа
-        if (
-            typeof DeviceOrientationEvent !== "undefined" &&
-            typeof DeviceOrientationEvent.requestPermission === "function"
-        ) {
-            DeviceOrientationEvent.requestPermission()
-                .then((response) => {
-                    if (response === "granted") {
-                        window.addEventListener("deviceorientation", updatePlanesWithSensors);
-                    } else {
-                        document.getElementById("info").textContent = "Permission denied.";
-                    }
-                })
-                .catch(console.error);
-        } else if ("DeviceOrientationEvent" in window) {
-            window.addEventListener("deviceorientation", updatePlanesWithSensors);
-        } else {
-            document.getElementById("info").textContent = "DeviceOrientationEvent не поддерживается.";
-        }
-
-        // Анимация сцены
-        function animate() {
-            requestAnimationFrame(animate);
-            renderer.render(scene, camera);
-        }
-        animate();
-    </script>
+    // Проверяем поддержку DeviceOrientationEvent
+    if (window.DeviceOrientationEvent) {
+      window.addEventListener('deviceorientation', handleOrientation);
+    } else {
+      alert('Ваше устройство не поддерживает события ориентации.');
+    }
+  </script>
 </body>
 </html>
-
