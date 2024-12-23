@@ -418,7 +418,7 @@
         scene.add(plane);
       }
 
-      // Данные сенсоров
+      // Обновление плоскостей с данными сенсоров
       function updatePlanesWithSensors(event) {
         const { alpha, beta, gamma } = event;
 
@@ -432,43 +432,26 @@
 
       // Доступ к данным гироскопа
       function startSensors() {
-  try {
-    if (typeof DeviceMotionEvent.requestPermission === 'function') {
-      DeviceMotionEvent.requestPermission()
-        .then(permissionState => {
-          if (permissionState === 'granted') {
-            window.addEventListener('devicemotion', handleMotionEvent);
+        try {
+          if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+            DeviceOrientationEvent.requestPermission()
+              .then(permissionState => {
+                if (permissionState === 'granted') {
+                  window.addEventListener('deviceorientation', updatePlanesWithSensors);
+                } else {
+                  alert('Доступ к гироскопу не предоставлен.');
+                }
+              })
+              .catch(error => {
+                alert('Ошибка при запросе разрешения на гироскоп:', error);
+              });
           } else {
-            alert('Доступ к акселерометру не предоставлен.');
+            window.addEventListener('deviceorientation', updatePlanesWithSensors);
           }
-        })
-        .catch(error => {
-          alert('Ошибка при запросе разрешения на акселерометр:', error);
-        });
-    } else {
-      window.addEventListener('devicemotion', handleMotionEvent);
-    }
-
-    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-      DeviceOrientationEvent.requestPermission()
-        .then(permissionState => {
-          if (permissionState === 'granted') {
-            window.addEventListener('deviceorientation', handleOrientationEvent);
-          } else {
-            alert('Доступ к гироскопу не предоставлен.');
-          }
-        })
-        .catch(error => {
-          alert('Ошибка при запросе разрешения на гироскоп:', error);
-        });
-    } else {
-      window.addEventListener('deviceorientation', handleOrientationEvent);
-    }
-  } catch (error) {
-    console.error('Ошибка при инициализации сенсоров:', error);
-  }
-}
-
+        } catch (error) {
+          console.error('Ошибка при инициализации сенсоров:', error);
+        }
+      }
 
       // Анимация сцены
       function animate() {
@@ -476,6 +459,9 @@
         renderer.render(scene, camera);
       }
       animate();
+
+      // Запуск сенсоров
+      startSensors();
     </script>
   </body>
 </html>
