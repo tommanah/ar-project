@@ -1,5 +1,333 @@
+<!-- <!doctype html>
+<html lang="en">
+ <head>
+   <meta charset="UTF-8" />
+   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+   <title>Depth Map on Video</title>
+   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/depth-estimation@2.0.0/dist/index.js"></script>
+   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+   <style>
+     body {
+       margin: 0;
+       display: flex;
+       flex-direction: column;
+       align-items: center;
+       justify-content: center;
+       background-color: black;
+     }
+     #video,
+     #depthCanvas {
+       position: absolute;
+       top: 0;
+       left: 0;
+       width: 100%;
+       height: auto;
+     }
+   </style>
+ </head>
+ <body>
+   <video id="video" autoplay playsinline></video>
+   <canvas id="depthCanvas"></canvas>
+
+   <script>
+     const video = document.getElementById("video");
+     const depthCanvas = document.getElementById("depthCanvas");
+     const depthCtx = depthCanvas.getContext("2d");
+     let depthEstimator;
+     async function toggleDepthMap() {
+       if (depthCanvas.style.display === "none") {
+         document.getElementById("toggleButton").innerText =
+           "Скрыть карту глубины";
+         depthCanvas.style.display = "block";
+         if (!video) await startCamera();
+
+         // Проверяем, загружена ли библиотека
+         if (typeof depthEstimation !== "undefined") {
+           if (!depthEstimator) await initializeDepthModel();
+           updateDepthMap();
+         } else {
+           console.error(
+             "depthEstimation не найден. Убедитесь, что библиотека правильно загружена.",
+           );
+         }
+       } else {
+         document.getElementById("toggleButton").innerText =
+           "Показать карту глубины";
+         depthCanvas.style.display = "none";
+       }
+     }
+     // Запуск камеры
+     async function startCamera() {
+       const stream = await navigator.mediaDevices.getUserMedia({
+         video: { facingMode: "environment" },
+       });
+       video.srcObject = stream;
+
+       // Ожидаем загрузки видео
+       video.onloadedmetadata = () => {
+         video.play();
+         depthCanvas.width = video.videoWidth;
+         depthCanvas.height = video.videoHeight;
+         initializeDepthModel();
+       };
+     }
+
+     // Инициализация модели TensorFlow
+     async function initializeDepthModel() {
+       depthEstimator = await depthEstimation.createEstimator(
+         depthEstimation.SupportedModels.COCODepthEstimation,
+       );
+       console.log("Depth model loaded");
+       processVideo();
+     }
+
+     // Обработка видео и отрисовка карты глубины
+     async function processVideo() {
+       if (depthEstimator && video.readyState >= video.HAVE_ENOUGH_DATA) {
+         // Генерация карты глубины
+         const depthMap = await depthEstimator.estimateDepth(video);
+         const depthData = depthMap.dataSync();
+         const width = depthCanvas.width;
+         const height = depthCanvas.height;
+
+         // Подготовка пикселей для отрисовки
+         const imageData = depthCtx.createImageData(width, height);
+         for (let i = 0; i < depthData.length; i++) {
+           const depthValue = Math.floor((1 - depthData[i]) * 255);
+           imageData.data[i * 4] = depthValue; // Red
+           imageData.data[i * 4 + 1] = depthValue; // Green
+           imageData.data[i * 4 + 2] = depthValue; // Blue
+           imageData.data[i * 4 + 3] = 150; // Alpha (прозрачность)
+         }
+         depthCtx.putImageData(imageData, 0, 0);
+       }
+
+       // Продолжаем обработку
+       requestAnimationFrame(processVideo);
+     }
+
+     // Запуск приложения
+     startCamera().catch((err) =>
+       console.error("Error accessing camera:", err),
+     );
+     document.body.innerHTML += '<button id="toggleButton" onclick="toggleDepthMap()">Показать карту глубины</button>'
+   </script>
+ </body>
+</html> -->
+
+<!-- <!doctype html>
+<html lang="en">
+ <head>
+   <meta charset="UTF-8" />
+   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+   <title>1 Depth Estimation with OpenCV.js</title>
+   <script async src="https://cdn.jsdelivr.net/npm/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
+ </head>
+ <body>
+   <h1>Depth Estimation from Camera Stream</h1>
+   <video id="video" width="640" height="480" autoplay></video>
+   <canvas id="depthCanvas" width="640" height="480"></canvas>
+
+   <script>
+     let videoElement;
+     let canvasElement;
+     let canvasContext;
+     let mat;
+     let thresholdMat;
+
+     // Функция, которая будет вызвана, когда OpenCV.js загрузится
+     function onOpenCvReady() {
+       if (cv && cv.getBuildInformation) {
+         console.log("OpenCV.js загружен и готов к использованию.");
+       } else {
+         console.error("OpenCV.js не загружен или не готов.");
+         return;
+       }
+
+       videoElement = document.getElementById("video");
+       canvasElement = document.getElementById("depthCanvas");
+       canvasContext = canvasElement.getContext("2d");
+
+       // Запрашиваем доступ к камере
+       navigator.mediaDevices
+         .getUserMedia({ video: true })
+         .then((stream) => {
+           videoElement.srcObject = stream;
+           videoElement.play();
+         })
+         .catch((err) => {
+           console.error("Ошибка доступа к камере", err);
+           alert(
+             "Не удается получить доступ к камере. Убедитесь, что разрешили доступ.",
+           );
+         });
+
+       // Настроим интервал для обработки видеопотока
+       setInterval(processVideo, 100); // Обработка каждые 100 мс
+     }
+
+     // Обработка видеопотока для оценки глубины
+     function processVideo() {
+       if (typeof cv === "undefined") {
+         console.error("OpenCV.js не загружен");
+         return;
+       }
+
+       // Проверяем, готов ли видеопоток
+       if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
+         // Создание Mat из видеопотока
+         mat = cv.imread(videoElement);
+
+         // Конвертация в градации серого (для приблизительной оценки глубины)
+         let gray = new cv.Mat();
+         cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY);
+
+         // Применение фильтра Гаусса для сглаживания
+         let depthMap = new cv.Mat();
+         cv.GaussianBlur(gray, depthMap, new cv.Size(5, 5), 1.5, 1.5);
+
+         // Применение пороговой обработки
+         thresholdMat = new cv.Mat();
+         cv.threshold(depthMap, thresholdMat, 100, 255, cv.THRESH_BINARY);
+
+         // Отображение результата на канвасе
+         cv.imshow("depthCanvas", thresholdMat);
+
+         // Очистка ресурсов
+         mat.delete();
+         gray.delete();
+         depthMap.delete();
+         thresholdMat.delete();
+       }
+     }
+   </script>
+ </body>
+</html> -->
+<!-- <!DOCTYPE html>
+
+<html lang="en">
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>3D Heatmap with Plane Detection</title>
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.153.0/three.min.js"></script>
+   <script src="https://docs.opencv.org/4.x/opencv.js"></script>
+   <style>
+       body, html {
+           margin: 0;
+           overflow: hidden;
+           background: black;
+       }
+       #canvas-container {
+           position: relative;
+           width: 100%;
+           height: 100vh;
+       }
+       video, canvas {
+           position: absolute;
+           top: 0;
+           left: 0;
+       }
+   </style>
+</head>
+<body>
+   <div id="canvas-container">
+       <video id="video" autoplay playsinline style="width: 100%; height: 100%;"></video>
+       <canvas id="heatmap" style="width: 100%; height: 100%;"></canvas>
+   </div>
+   <script>
+       const video = document.getElementById('video');
+       const heatmapCanvas = document.getElementById('heatmap');
+       const heatmapCtx = heatmapCanvas.getContext('2d');
+       const container = document.getElementById('canvas-container');
+
+       // Resize canvas to fit screen
+       function resizeCanvas() {
+           heatmapCanvas.width = container.offsetWidth;
+           heatmapCanvas.height = container.offsetHeight;
+       }
+       resizeCanvas();
+       window.addEventListener('resize', resizeCanvas);
+
+       // Access device camera
+       async function initCamera() {
+           const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+           video.srcObject = stream;
+
+           return new Promise(resolve => {
+               video.onloadedmetadata = () => resolve();
+           });
+       }
+
+       // Initialize OpenCV for plane detection and heatmap
+       async function initOpenCV() {
+           await initCamera();
+
+           // Prepare OpenCV Mat objects
+           const cap = new cv.VideoCapture(video);
+           const frame = new cv.Mat(video.videoHeight, video.videoWidth, cv.CV_8UC4);
+           const gray = new cv.Mat();
+           const prevGray = new cv.Mat();
+           let firstRun = true;
+
+           // Heatmap parameters
+           const heatmapData = Array.from({ length: heatmapCanvas.width * heatmapCanvas.height }, () => 0);
+
+           // Render loop
+           function renderHeatmap() {
+               // Capture frame
+               cap.read(frame);
+               cv.cvtColor(frame, gray, cv.COLOR_RGBA2GRAY);
+
+               if (!firstRun) {
+                   // Optical flow (Lucas-Kanade method)
+                   const flow = new cv.Mat();
+                   cv.calcOpticalFlowFarneback(prevGray, gray, flow, 0.5, 3, 15, 3, 5, 1.2, 0);
+
+                   // Process flow to create heatmap
+                   for (let y = 0; y < flow.rows; y++) {
+                       for (let x = 0; x < flow.cols; x++) {
+                           const flowValue = flow.data[y * flow.cols + x];
+                           const idx = y * heatmapCanvas.width + x;
+                           heatmapData[idx] += Math.min(Math.abs(flowValue), 255);
+                       }
+                   }
+                   flow.delete();
+               } else {
+                   firstRun = false;
+               }
+
+               // Update previous frame
+               gray.copyTo(prevGray);
+
+               // Render heatmap
+               const imgData = heatmapCtx.getImageData(0, 0, heatmapCanvas.width, heatmapCanvas.height);
+               for (let i = 0; i < heatmapData.length; i++) {
+                   const colorValue = Math.min(heatmapData[i], 255);
+                   imgData.data[i * 4] = colorValue;     // Red
+                   imgData.data[i * 4 + 1] = 0;         // Green
+                   imgData.data[i * 4 + 2] = 255 - colorValue; // Blue
+                   imgData.data[i * 4 + 3] = 255;       // Alpha
+               }
+               heatmapCtx.putImageData(imgData, 0, 0);
+
+               // Schedule next frame
+               requestAnimationFrame(renderHeatmap);
+           }
+
+           renderHeatmap();
+       }
+
+       initOpenCV().catch(console.error);
+   </script>
+</body>
+</html> -->
+
+
 
 <html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
 	<title>Show What Information is Being Sensed in the World</title>
 	<meta charset="utf-8">
@@ -31,6 +359,9 @@
  -->        
         <script src="../../dist/webxr-polyfill.js"></script>
 	<script src="../common.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sensor Example</title>
 </head>
 <body>
 <div id="target" />
@@ -95,7 +426,22 @@
                 this.session.addEventListener(XRSession.REMOVE_WORLD_ANCHOR, this._handleRemoveWorldAnchor.bind(this))
                 
             }
-        }
+    <h1>Sensor Example</h1>
+    <div id="output"></div>
+    <script>
+        const output = document.getElementById('output');
+
+        function handleOrientation(event) {
+            const alpha = event.alpha; // Rotation around Z-axis
+            const beta = event.beta;   // Rotation around X-axis
+            const gamma = event.gamma; // Rotation around Y-axis
+
+            output.innerHTML = `
+                <p>Alpha (Z): ${alpha.toFixed(2)}</p>
+                <p>Beta (X): ${beta.toFixed(2)}</p>
+                <p>Gamma (Y): ${gamma.toFixed(2)}</p>
+            `;
+}
 
         _handleUpdateWorldAnchor(event) {
             let anchor = event.detail
@@ -131,12 +477,19 @@
                                 anchor.node.add(mesh)
                             }
                         }
-                    } else {
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+            // iOS 13+ requires permission
+            DeviceOrientationEvent.requestPermission()
+                .then(permissionState => {
+                    if (permissionState === 'granted') {
+                        window.addEventListener('deviceorientation', handleOrientation);
+} else {
                         mesh = this.newMeshNode(anchor, '#11FF11', '#009900')
                         if (mesh) {
                             mesh.extent = [anchor.extent[0], anchor.extent[1]]
                         }
-                    }
+                        output.innerHTML = '<p>Permission denied</p>';
+}
                 }
             }
 		}
@@ -146,7 +499,14 @@
             if (anchor.node !== null) {
                 this.removeAnchoredNode(anchor.node);
             }                
-        }
+                })
+                .catch(console.error);
+        } else if ('DeviceOrientationEvent' in window) {
+            // For other devices
+            window.addEventListener('deviceorientation', handleOrientation);
+        } else {
+            output.innerHTML = '<p>Device orientation not supported</p>';
+}
 
         _handleNewWorldAnchor(event) {
             let anchor = event.detail
@@ -244,5 +604,6 @@
         }, 1000)
     })
 </script>
+    </script>
 </body>
 </html>
