@@ -3,115 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plane Detection and Heatmap</title>
-    <script src="https://cdn.jsdelivr.net/npm/heatmap.js@2.0.5/build/heatmap.min.js"></script>
+    <title>Sensor and Camera Access</title>
     <style>
-        body, html {
+        body {
+            font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
-            overflow: hidden;
         }
-        canvas, video {
+        #container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        #video {
             position: absolute;
             top: 0;
             left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
         }
-        video {
-            z-index: 1;
-        }
-        canvas {
-            z-index: 2;
+        #data {
+            margin-top: 20px;
         }
     </style>
 </head>
 <body>
     <video id="video" autoplay muted playsinline></video>
-    <canvas id="heatmapCanvas"></canvas>
+    <div id="container">
+        <button id="startButton">Start Sensors</button>
+        <div id="data">
+            <h3>Accelerometer Data</h3>
+            <p id="accelerationData">Waiting for data...</p>
+            <h3>Gyroscope Data</h3>
+            <p id="gyroData">Waiting for data...</p>
+        </div>
+    </div>
 
     <script>
         const video = document.getElementById('video');
-        const heatmapCanvas = document.getElementById('heatmapCanvas');
-        const heatmapContext = heatmapCanvas.getContext('2d');
+        const accelerationData = document.getElementById('accelerationData');
+        const gyroData = document.getElementById('gyroData');
+        const startButton = document.getElementById('startButton');
 
-        const heatmapInstance = h337.create({
-            container: document.body,
-            radius: 50,
-            maxOpacity: 0.8,
-        });
+        let sensorDataStarted = false;
 
-        // Resize the canvas to match the screen size
-        function resizeCanvas() {
-            heatmapCanvas.width = window.innerWidth;
-            heatmapCanvas.height = window.innerHeight;
-        }
-        resizeCanvas();
-        window.addEventListener('resize', resizeCanvas);
-
-        // Start the video stream from the camera
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(stream => {
-            video.srcObject = stream;
-        }).catch(err => {
-            console.error("Error accessing camera:", err);
-        });
-
-        // Collect device orientation data
-        let orientation = { alpha: 0, beta: 0, gamma: 0 };
-        window.addEventListener('deviceorientation', (event) => {
-            orientation = {
-                alpha: event.alpha,
-                beta: event.beta,
-                gamma: event.gamma,
-            };
-        });
-
-        // Heatmap data
-        const heatmapData = [];
-
-        // Generate heatmap points based on orientation
-        function updateHeatmap() {
-            const x = window.innerWidth / 2 + (orientation.gamma || 0) * 10;
-            const y = window.innerHeight / 2 - (orientation.beta || 0) * 10;
-
-            heatmapData.push({ x, y, value: 1 });
-
-            heatmapInstance.setData({
-                max: 10,
-                data: heatmapData,
+        // Start video stream (camera access)
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+            .then(stream => {
+                video.srcObject = stream;
+            })
+            .catch(err => {
+                console.error("Error accessing camera:", err);
             });
-        }
 
-        // Process video frames for basic edge detection
-        function processVideoFrame() {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
+        // Function to handle device motion (gyro and accel)
+        function handleDeviceMotion(event) {
+            const acceleration = event.acceleration;
+            const rotation = event.rotationRate;
 
-            // Draw the current video frame
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-            // Apply a simple edge detection filter
-            for (let i = 0; i < frame.data.length; i += 4) {
-                const brightness = (frame.data[i] + frame.data[i + 1] + frame.data[i + 2]) / 3;
-                const isEdge = brightness < 100 ? 255 : 0;
-                frame.data[i] = frame.data[i + 1] = frame.data[i + 2] = isEdge;
+            if (acceleration) {
+                accelerationData.innerText = `X: ${acceleration.x.toFixed(2)} m/s², Y: ${acceleration.y.toFixed(2)} m/s², Z: ${acceleration.z.toFixed(2)} m/s²`;
             }
-            ctx.putImageData(frame, 0, 0);
 
-            // Overlay the processed frame on the main heatmap canvas
-            heatmapContext.drawImage(canvas, 0, 0, heatmapCanvas.width, heatmapCanvas.height);
+            if (rotation) {
+                gyroData.innerText = `Alpha: ${rotation.alpha.toFixed(2)}° / Beta: ${rotation.beta.toFixed(2)}° / Gamma: ${rotation.gamma.toFixed(2)}°`;
+            }
         }
 
-        // Main rendering loop
-        function renderLoop() {
-            updateHeatmap();
-            processVideoFrame();
-            requestAnimationFrame(renderLoop);
+        // Function to start the sensors
+        function startSensors() {
+            if (!sensorDataStarted) {
+                // Listen to device motion events
+                window.addEventListener('devicemotion', handleDeviceMotion);
+                sensorDataStarted = true;
+                startButton.innerText = "Stop Sensors";
+            } else {
+                // Stop listening to device motion events
+                window.removeEventListener('devicemotion', handleDeviceMotion);
+                sensorDataStarted = false;
+                startButton.innerText = "Start Sensors";
+                accelerationData.innerText = "Waiting for data...";
+                gyroData.innerText = "Waiting for data...";
+            }
         }
 
-        // Start rendering when the video is ready
-        video.addEventListener('play', renderLoop);
+        // Set up event listener for the button
+        startButton.addEventListener('click', startSensors);
     </script>
 </body>
 </html>
