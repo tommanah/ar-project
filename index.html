@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Plane Detection and Heatmap</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/heatmap.js/2.0.5/heatmap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/heatmap.js@2.0.5/build/heatmap.min.js"></script>
     <style>
         body, html {
             margin: 0;
@@ -48,7 +48,7 @@
         window.addEventListener('resize', resizeCanvas);
 
         // Start the video stream from the camera
-        navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(stream => {
             video.srcObject = stream;
         }).catch(err => {
             console.error("Error accessing camera:", err);

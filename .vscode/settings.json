@@ -1,0 +1,7 @@
+{
+    "liveServer.settings.https": {
+        "enable": true,
+        "cert": "path_to_your_certificate.crt",
+        "key": "path_to_your_private_key.key"
+    }
+}
