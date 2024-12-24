@@ -1,99 +1,113 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+  <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sensor and Camera Access</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-        }
-        #container {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background: rgba(0, 0, 0, 0.5);
-            color: white;
-            padding: 20px;
-            border-radius: 8px;
-        }
-        #video {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -1;
-        }
-        #data {
-            margin-top: 20px;
-        }
-    </style>
-</head>
-<body>
-    <video id="video" autoplay muted playsinline></video>
-    <div id="container">
-        <button id="startButton">Start Sensors</button>
-        <div id="data">
-            <h3>Accelerometer Data</h3>
-            <p id="accelerationData">Waiting for data...</p>
-            <h3>Gyroscope Data</h3>
-            <p id="gyroData">Waiting for data...</p>
-        </div>
+    <title>AR</title>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://cdn.rawgit.com/jeromeetienne/AR.js/2.1.4/aframe/build/aframe-ar.js"></script>
+  </head>
+  <body style="margin: 0">
+
+    <button onclick="toggleCameraAndSensors()" style="position: fixed; top: 10px; left: 10px; z-index: 1000;">Toggle Camera and Sensors</button>
+
+    <div id="sensorData" style="position: fixed; top: 50px; left: 10px; background: rgba(255, 255, 255, 0.8); padding: 10px; z-index: 1000; display: none;">
+      <h3>Sensor Data</h3>
+      <p><strong>Accelerometer:</strong></p>
+      <p>x: <span id="accelX">0</span></p>
+      <p>y: <span id="accelY">0</span></p>
+      <p>z: <span id="accelZ">0</span></p>
+      <p><strong>Gyroscope:</strong></p>
+      <p>alpha: <span id="gyroAlpha">0</span></p>
+      <p>beta: <span id="gyroBeta">0</span></p>
+      <p>gamma: <span id="gyroGamma">0</span></p>
     </div>
 
+    <a-scene>
+      <a-entity camera></a-entity>
+      <a-entity id="heatmap" visible="false"></a-entity>
+    </a-scene>
+    
     <script>
-        const video = document.getElementById('video');
-        const accelerationData = document.getElementById('accelerationData');
-        const gyroData = document.getElementById('gyroData');
-        const startButton = document.getElementById('startButton');
+      let sensorsActive = false;
+      let accelerometer, gyroscope;
 
-        let sensorDataStarted = false;
+      function toggleCameraAndSensors() {
+        sensorsActive = !sensorsActive;
+        document.getElementById('sensorData').style.display = sensorsActive ? 'block' : 'none';
 
-        // Start video stream (camera access)
+        if (sensorsActive) {
+          startCamera();
+          startSensors();
+        } else {
+          stopCamera();
+          stopSensors();
+        }
+      }
+
+      function startCamera() {
         navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-            .then(stream => {
-                video.srcObject = stream;
-            })
-            .catch(err => {
-                console.error("Error accessing camera:", err);
-            });
+          .then(stream => {
+            const video = document.createElement('video');
+            video.srcObject = stream;
+            video.play();
+          })
+          .catch(error => {
+            console.error("Ошибка доступа к камере:", error);
+          });
+      }
 
-        // Function to handle device motion (gyro and accel)
-        function handleDeviceMotion(event) {
-            const acceleration = event.acceleration;
-            const rotation = event.rotationRate;
+      function stopAR() {
+    if (videoStream) {
+      const tracks = videoStream.getTracks();
+      tracks.forEach(track => track.stop());
+      videoStream = null;
+    }
 
-            if (acceleration) {
-                accelerationData.innerText = `X: ${acceleration.x.toFixed(2)} m/s², Y: ${acceleration.y.toFixed(2)} m/s², Z: ${acceleration.z.toFixed(2)} m/s²`;
+    const video = document.querySelector('video');
+    if (video) {
+      document.body.removeChild(video);
+    }}
+
+      function startSensors() {
+        // Проверяем наличие сенсоров
+        if (typeof DeviceMotionEvent.requestPermission === 'function') {
+          DeviceMotionEvent.requestPermission().then(response => {
+            if (response === 'granted') {
+              window.addEventListener('devicemotion', handleMotionEvent);
             }
-
-            if (rotation) {
-                gyroData.innerText = `Alpha: ${rotation.alpha.toFixed(2)}° / Beta: ${rotation.beta.toFixed(2)}° / Gamma: ${rotation.gamma.toFixed(2)}°`;
-            }
+          }).catch(console.error);
+        } else {
+          window.addEventListener('devicemotion', handleMotionEvent);
         }
 
-        // Function to start the sensors
-        function startSensors() {
-            if (!sensorDataStarted) {
-                // Listen to device motion events
-                window.addEventListener('devicemotion', handleDeviceMotion);
-                sensorDataStarted = true;
-                startButton.innerText = "Stop Sensors";
-            } else {
-                // Stop listening to device motion events
-                window.removeEventListener('devicemotion', handleDeviceMotion);
-                sensorDataStarted = false;
-                startButton.innerText = "Start Sensors";
-                accelerationData.innerText = "Waiting for data...";
-                gyroData.innerText = "Waiting for data...";
+        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+          DeviceOrientationEvent.requestPermission().then(response => {
+            if (response === 'granted') {
+              window.addEventListener('deviceorientation', handleOrientationEvent);
             }
+          }).catch(console.error);
+        } else {
+          window.addEventListener('deviceorientation', handleOrientationEvent);
         }
+      }
 
-        // Set up event listener for the button
-        startButton.addEventListener('click', startSensors);
+      function stopSensors() {
+        window.removeEventListener('devicemotion', handleMotionEvent);
+        window.removeEventListener('deviceorientation', handleOrientationEvent);
+      }
+
+      function handleMotionEvent(event) {
+        document.getElementById('accelX').textContent = event.acceleration.x.toFixed(2);
+        document.getElementById('accelY').textContent = event.acceleration.y.toFixed(2);
+        document.getElementById('accelZ').textContent = event.acceleration.z.toFixed(2);
+      }
+
+      function handleOrientationEvent(event) {
+        document.getElementById('gyroAlpha').textContent = event.alpha ? event.alpha.toFixed(2) : 0;
+        document.getElementById('gyroBeta').textContent = event.beta ? event.beta.toFixed(2) : 0;
+        document.getElementById('gyroGamma').textContent = event.gamma ? event.gamma.toFixed(2) : 0;
+      }
     </script>
-</body>
+  </body>
 </html>
