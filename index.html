@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR Camera Viewer</title>
+    <title>AR with WebXR Viewer</title>
     <style>
         body, html {
             margin: 0;
@@ -21,21 +21,21 @@
 <body>
 <script>
 (async () => {
-    // Check for WebXR support
+    // Проверяем поддержку WebXR
     if (!navigator.xr) {
         alert('WebXR is not supported on this device or browser.');
         return;
     }
 
     try {
-        // Check if immersive AR is supported
+        // Проверяем поддержку immersive-ar
         const isARSupported = await navigator.xr.isSessionSupported('immersive-ar');
         if (!isARSupported) {
             alert('Immersive AR is not supported on this device.');
             return;
         }
 
-        // Create a Three.js scene
+        // Создаем сцену Three.js
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -43,37 +43,27 @@
         renderer.setPixelRatio(window.devicePixelRatio);
         document.body.appendChild(renderer.domElement);
 
-        // Add a light
-        const light = new THREE.DirectionalLight(0xffffff, 1);
-        light.position.set(0, 10, 10);
-        scene.add(light);
-
-        // Add a cube to the scene
+        // Добавляем объект в сцену
         const geometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
         const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
         const cube = new THREE.Mesh(geometry, material);
-        cube.position.set(0, 0, -0.5); // Half a meter in front of the user
+        cube.position.set(0, 0, -0.5); // Полметра перед пользователем
         scene.add(cube);
 
-        // Start AR session
+        // Запускаем AR-сессию
         const session = await navigator.xr.requestSession('immersive-ar', {
-            requiredFeatures: ['local-floor'], // Ensure AR session is relative to the floor
+            optionalFeatures: ['local-floor', 'bounded-floor'], // Обеспечивает поддержку привязки к полу
         });
 
         renderer.xr.enabled = true;
-        renderer.xr.setReferenceSpaceType('local-floor');
         renderer.xr.setSession(session);
 
-        // Animate the scene
-        function animate() {
-            renderer.setAnimationLoop(() => {
-                renderer.render(scene, camera);
-            });
-        }
-        animate();
-
+        // Анимация сцены
+        renderer.setAnimationLoop(() => {
+            renderer.render(scene, camera);
+        });
     } catch (error) {
-        console.error('Error starting AR session:', error);
+        console.error('Failed to start AR session:', error);
         alert('Failed to start AR session. Check console for details.');
     }
 })();
