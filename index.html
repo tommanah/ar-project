@@ -28,13 +28,13 @@
         <a-entity camera></a-entity>
 
         <!-- Axes Visualization -->
-        <a-entity id="accelXLine" line="start: 0, 0, 0; end: 1, 0, 0; color: red;" position="0 0 -3"></a-entity>
-        <a-entity id="accelYLine" line="start: 0, 0, 0; end: 0, 1, 0; color: green;" position="0 0 -3"></a-entity>
-        <a-entity id="accelZLine" line="start: 0, 0, 0; end: 0, 0, 1; color: blue;" position="0 0 -3"></a-entity>
+        <a-entity id="accelXLine" line="start: 0, 0, 0; end: 0.5, 0, 0; color: red; lineWidth: 10" position="0 0 -3"></a-entity>
+        <a-entity id="accelYLine" line="start: 0, 0, 0; end: 0, 0.5, 0; color: green; lineWidth: 10" position="0 0 -3"></a-entity>
+        <a-entity id="accelZLine" line="start: 0, 0, 0; end: 0, 0, 0.5; color: blue; lineWidth: 10" position="0 0 -3"></a-entity>
 
-        <a-entity id="gyroAlphaLine" line="start: 0, 0, 0; end: 1, 0, 0; color: red;" position="0 0 -3"></a-entity>
-        <a-entity id="gyroBetaLine" line="start: 0, 0, 0; end: 0, 1, 0; color: green;" position="0 0 -3"></a-entity>
-        <a-entity id="gyroGammaLine" line="start: 0, 0, 0; end: 0, 0, 1; color: blue;" position="0 0 -3"></a-entity>
+        <a-entity id="gyroAlphaLine" line="start: 0, 0, 0; end: 0.5, 0, 0; color: red; lineWidth: 10" position="0 0 -3"></a-entity>
+        <a-entity id="gyroBetaLine" line="start: 0, 0, 0; end: 0, 0.5, 0; color: green; lineWidth: 10" position="0 0 -3"></a-entity>
+        <a-entity id="gyroGammaLine" line="start: 0, 0, 0; end: 0, 0, 0.5; color: blue; lineWidth: 10" position="0 0 -3"></a-entity>
 
         <a-entity id="heatmap" visible="false"></a-entity>
     </a-scene>
@@ -109,9 +109,9 @@
             document.getElementById('accelZ').textContent = accelZ.toFixed(2);
 
             // Update Axes Visualization
-            document.getElementById('accelXLine').setAttribute('line', `start: 0, 0, 0; end: ${accelX}, 0, 0`);
-            document.getElementById('accelYLine').setAttribute('line', `start: 0, 0, 0; end: 0, ${accelY}, 0`);
-            document.getElementById('accelZLine').setAttribute('line', `start: 0, 0, 0; end: 0, 0, ${accelZ}`);
+            document.getElementById('accelXLine').setAttribute('line', `start: 0, 0, 0; end: ${accelX * 0.5}, 0, 0`);
+            document.getElementById('accelYLine').setAttribute('line', `start: 0, 0, 0; end: 0, ${accelY * 0.5}, 0`);
+            document.getElementById('accelZLine').setAttribute('line', `start: 0, 0, 0; end: 0, 0, ${accelZ * 0.5}`);
         }
 
         function handleOrientationEvent(event) {
@@ -124,9 +124,9 @@
             document.getElementById('gyroGamma').textContent = gyroGamma ? gyroGamma.toFixed(2) : 0;
 
             // Update Gyroscope Axes Visualization
-            document.getElementById('gyroAlphaLine').setAttribute('line', `start: 0, 0, 0; end: ${gyroAlpha}, 0, 0`);
-            document.getElementById('gyroBetaLine').setAttribute('line', `start: 0, 0, 0; end: 0, ${gyroBeta}, 0`);
-            document.getElementById('gyroGammaLine').setAttribute('line', `start: 0, 0, 0; end: 0, 0, ${gyroGamma}`);
+            document.getElementById('gyroAlphaLine').setAttribute('line', `start: 0, 0, 0; end: ${gyroAlpha * 0.5}, 0, 0`);
+            document.getElementById('gyroBetaLine').setAttribute('line', `start: 0, 0, 0; end: 0, ${gyroBeta * 0.5}, 0`);
+            document.getElementById('gyroGammaLine').setAttribute('line', `start: 0, 0, 0; end: 0, 0, ${gyroGamma * 0.5}`);
         }
     </script>
 </body>
