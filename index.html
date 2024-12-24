@@ -11,28 +11,35 @@
             padding: 0;
             overflow: hidden;
         }
-        canvas {
+        canvas, video {
             position: absolute;
             top: 0;
             left: 0;
         }
+        video {
+            z-index: 1;
+        }
+        canvas {
+            z-index: 2;
+        }
     </style>
 </head>
 <body>
-    <video id="video" autoplay muted playsinline style="position:absolute; top:0; left:0; z-index:1;"></video>
+    <video id="video" autoplay muted playsinline></video>
     <canvas id="heatmapCanvas"></canvas>
 
     <script>
         const video = document.getElementById('video');
         const heatmapCanvas = document.getElementById('heatmapCanvas');
         const heatmapContext = heatmapCanvas.getContext('2d');
+
         const heatmapInstance = h337.create({
             container: document.body,
             radius: 50,
             maxOpacity: 0.8,
         });
 
-        // Resize canvas to fit screen
+        // Resize the canvas to match the screen size
         function resizeCanvas() {
             heatmapCanvas.width = window.innerWidth;
             heatmapCanvas.height = window.innerHeight;
@@ -40,28 +47,32 @@
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
 
-        // Start video from the camera
+        // Start the video stream from the camera
         navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
             video.srcObject = stream;
         }).catch(err => {
             console.error("Error accessing camera:", err);
         });
 
-        // Device orientation data
+        // Collect device orientation data
         let orientation = { alpha: 0, beta: 0, gamma: 0 };
         window.addEventListener('deviceorientation', (event) => {
-            orientation = { alpha: event.alpha, beta: event.beta, gamma: event.gamma };
+            orientation = {
+                alpha: event.alpha,
+                beta: event.beta,
+                gamma: event.gamma,
+            };
         });
 
         // Heatmap data
         const heatmapData = [];
 
-        // Update heatmap based on device orientation and simulated "points of interest"
+        // Generate heatmap points based on orientation
         function updateHeatmap() {
-            const centerX = window.innerWidth / 2 + (orientation.gamma || 0) * 10;
-            const centerY = window.innerHeight / 2 - (orientation.beta || 0) * 10;
+            const x = window.innerWidth / 2 + (orientation.gamma || 0) * 10;
+            const y = window.innerHeight / 2 - (orientation.beta || 0) * 10;
 
-            heatmapData.push({ x: centerX, y: centerY, value: 1 });
+            heatmapData.push({ x, y, value: 1 });
 
             heatmapInstance.setData({
                 max: 10,
@@ -69,17 +80,18 @@
             });
         }
 
-        // Process video frames (for edge detection or further analysis)
+        // Process video frames for basic edge detection
         function processVideoFrame() {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
 
+            // Draw the current video frame
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-            // Example: Highlight edges (simple threshold for illustration)
+            // Apply a simple edge detection filter
             for (let i = 0; i < frame.data.length; i += 4) {
                 const brightness = (frame.data[i] + frame.data[i + 1] + frame.data[i + 2]) / 3;
                 const isEdge = brightness < 100 ? 255 : 0;
@@ -87,18 +99,18 @@
             }
             ctx.putImageData(frame, 0, 0);
 
-            // Draw processed frame over video
+            // Overlay the processed frame on the main heatmap canvas
             heatmapContext.drawImage(canvas, 0, 0, heatmapCanvas.width, heatmapCanvas.height);
         }
 
-        // Main render loop
+        // Main rendering loop
         function renderLoop() {
             updateHeatmap();
             processVideoFrame();
             requestAnimationFrame(renderLoop);
         }
 
-        // Start rendering after video is ready
+        // Start rendering when the video is ready
         video.addEventListener('play', renderLoop);
     </script>
 </body>
