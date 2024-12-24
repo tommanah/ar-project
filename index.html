@@ -3,70 +3,103 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR with WebXR Viewer</title>
+    <title>Plane Detection and Heatmap</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/heatmap.js/2.0.5/heatmap.min.js"></script>
     <style>
         body, html {
             margin: 0;
             padding: 0;
             overflow: hidden;
-            width: 100%;
-            height: 100%;
         }
         canvas {
-            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
         }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r150/three.min.js"></script>
 </head>
 <body>
-<script>
-(async () => {
-    // Проверяем поддержку WebXR
-    if (!navigator.xr) {
-        alert('WebXR is not supported on this device or browser.');
-        return;
-    }
+    <video id="video" autoplay muted playsinline style="position:absolute; top:0; left:0; z-index:1;"></video>
+    <canvas id="heatmapCanvas"></canvas>
 
-    try {
-        // Проверяем поддержку immersive-ar
-        const isARSupported = await navigator.xr.isSessionSupported('immersive-ar');
-        if (!isARSupported) {
-            alert('Immersive AR is not supported on this device.');
-            return;
+    <script>
+        const video = document.getElementById('video');
+        const heatmapCanvas = document.getElementById('heatmapCanvas');
+        const heatmapContext = heatmapCanvas.getContext('2d');
+        const heatmapInstance = h337.create({
+            container: document.body,
+            radius: 50,
+            maxOpacity: 0.8,
+        });
+
+        // Resize canvas to fit screen
+        function resizeCanvas() {
+            heatmapCanvas.width = window.innerWidth;
+            heatmapCanvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Start video from the camera
+        navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+            video.srcObject = stream;
+        }).catch(err => {
+            console.error("Error accessing camera:", err);
+        });
+
+        // Device orientation data
+        let orientation = { alpha: 0, beta: 0, gamma: 0 };
+        window.addEventListener('deviceorientation', (event) => {
+            orientation = { alpha: event.alpha, beta: event.beta, gamma: event.gamma };
+        });
+
+        // Heatmap data
+        const heatmapData = [];
+
+        // Update heatmap based on device orientation and simulated "points of interest"
+        function updateHeatmap() {
+            const centerX = window.innerWidth / 2 + (orientation.gamma || 0) * 10;
+            const centerY = window.innerHeight / 2 - (orientation.beta || 0) * 10;
+
+            heatmapData.push({ x: centerX, y: centerY, value: 1 });
+
+            heatmapInstance.setData({
+                max: 10,
+                data: heatmapData,
+            });
         }
 
-        // Создаем сцену Three.js
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
-        document.body.appendChild(renderer.domElement);
+        // Process video frames (for edge detection or further analysis)
+        function processVideoFrame() {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
 
-        // Добавляем объект в сцену
-        const geometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
-        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-        const cube = new THREE.Mesh(geometry, material);
-        cube.position.set(0, 0, -0.5); // Полметра перед пользователем
-        scene.add(cube);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-        // Запускаем AR-сессию
-        const session = await navigator.xr.requestSession('immersive-ar', {
-            optionalFeatures: ['local-floor', 'bounded-floor'], // Обеспечивает поддержку привязки к полу
-        });
+            // Example: Highlight edges (simple threshold for illustration)
+            for (let i = 0; i < frame.data.length; i += 4) {
+                const brightness = (frame.data[i] + frame.data[i + 1] + frame.data[i + 2]) / 3;
+                const isEdge = brightness < 100 ? 255 : 0;
+                frame.data[i] = frame.data[i + 1] = frame.data[i + 2] = isEdge;
+            }
+            ctx.putImageData(frame, 0, 0);
 
-        renderer.xr.enabled = true;
-        renderer.xr.setSession(session);
+            // Draw processed frame over video
+            heatmapContext.drawImage(canvas, 0, 0, heatmapCanvas.width, heatmapCanvas.height);
+        }
 
-        // Анимация сцены
-        renderer.setAnimationLoop(() => {
-            renderer.render(scene, camera);
-        });
-    } catch (error) {
-        console.error('Failed to start AR session:', error);
-        alert('Failed to start AR session. Check console for details.');
-    }
-})();
-</script>
+        // Main render loop
+        function renderLoop() {
+            updateHeatmap();
+            processVideoFrame();
+            requestAnimationFrame(renderLoop);
+        }
+
+        // Start rendering after video is ready
+        video.addEventListener('play', renderLoop);
+    </script>
 </body>
 </html>
