@@ -1,133 +1,112 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+  <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR with Sensors</title>
+    <title>AR</title>
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://cdn.rawgit.com/jeromeetienne/AR.js/2.1.4/aframe/build/aframe-ar.js"></script>
-</head>
-<body style="margin: 0">
+  </head>
+  <body style="margin: 0">
 
     <button onclick="toggleCameraAndSensors()" style="position: fixed; top: 10px; left: 10px; z-index: 1000;">Toggle Camera and Sensors</button>
 
     <div id="sensorData" style="position: fixed; top: 50px; left: 10px; background: rgba(255, 255, 255, 0.8); padding: 10px; z-index: 1000; display: none;">
-        <h3>Sensor Data</h3>
-        <p><strong>Accelerometer:</strong></p>
-        <p>x: <span id="accelX">0</span></p>
-        <p>y: <span id="accelY">0</span></p>
-        <p>z: <span id="accelZ">0</span></p>
-        <p><strong>Gyroscope:</strong></p>
-        <p>alpha: <span id="gyroAlpha">0</span></p>
-        <p>beta: <span id="gyroBeta">0</span></p>
-        <p>gamma: <span id="gyroGamma">0</span></p>
+      <h3>Sensor Data</h3>
+      <p><strong>Accelerometer:</strong></p>
+      <p>x: <span id="accelX">0</span></p>
+      <p>y: <span id="accelY">0</span></p>
+      <p>z: <span id="accelZ">0</span></p>
+      <p><strong>Gyroscope:</strong></p>
+      <p>alpha: <span id="gyroAlpha">0</span></p>
+      <p>beta: <span id="gyroBeta">0</span></p>
+      <p>gamma: <span id="gyroGamma">0</span></p>
     </div>
 
     <a-scene>
-        <!-- Camera Entity -->
-        <a-entity camera></a-entity>
-
-        <!-- Axes Visualization -->
-        <a-entity id="accelXLine" line="start: 0, 0, 0; end: 0.5, 0, 0; color: red; lineWidth: 10" position="0 0 -3"></a-entity>
-        <a-entity id="accelYLine" line="start: 0, 0, 0; end: 0, 0.5, 0; color: green; lineWidth: 10" position="0 0 -3"></a-entity>
-        <a-entity id="accelZLine" line="start: 0, 0, 0; end: 0, 0, 0.5; color: blue; lineWidth: 10" position="0 0 -3"></a-entity>
-
-        <a-entity id="gyroAlphaLine" line="start: 0, 0, 0; end: 0.5, 0, 0; color: red; lineWidth: 10" position="0 0 -3"></a-entity>
-        <a-entity id="gyroBetaLine" line="start: 0, 0, 0; end: 0, 0.5, 0; color: green; lineWidth: 10" position="0 0 -3"></a-entity>
-        <a-entity id="gyroGammaLine" line="start: 0, 0, 0; end: 0, 0, 0.5; color: blue; lineWidth: 10" position="0 0 -3"></a-entity>
-
-        <a-entity id="heatmap" visible="false"></a-entity>
+      <a-entity camera></a-entity>
+      <a-entity id="heatmap" visible="false"></a-entity>
     </a-scene>
-
+    
     <script>
-        let sensorsActive = false;
+      let sensorsActive = false;
+      let accelerometer, gyroscope;
 
-        function toggleCameraAndSensors() {
-            sensorsActive = !sensorsActive;
-            document.getElementById('sensorData').style.display = sensorsActive ? 'block' : 'none';
+      function toggleCameraAndSensors() {
+        sensorsActive = !sensorsActive;
+        document.getElementById('sensorData').style.display = sensorsActive ? 'block' : 'none';
 
-            if (sensorsActive) {
-                startCamera();
-                startSensors();
-            } else {
-                stopCamera();
-                stopSensors();
+        if (sensorsActive) {
+          startCamera();
+          startSensors();
+        } else {
+          stopCamera();
+          stopSensors();
+        }
+      }
+
+      function startCamera() {
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+          .then(stream => {
+            const video = document.createElement('video');
+            video.srcObject = stream;
+            video.play();
+          })
+          .catch(error => {
+            console.error("Ошибка доступа к камере:", error);
+          });
+      }
+
+      function stopAR() {
+    if (videoStream) {
+      const tracks = videoStream.getTracks();
+      tracks.forEach(track => track.stop());
+      videoStream = null;
+    }
+
+    const video = document.querySelector('video');
+    if (video) {
+      document.body.removeChild(video);
+    }}
+
+      function startSensors() {
+        // Проверяем наличие сенсоров
+        if (typeof DeviceMotionEvent.requestPermission === 'function') {
+          DeviceMotionEvent.requestPermission().then(response => {
+            if (response === 'granted') {
+              window.addEventListener('devicemotion', handleMotionEvent);
             }
+          }).catch(console.error);
+        } else {
+          window.addEventListener('devicemotion', handleMotionEvent);
         }
 
-        function startCamera() {
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-                .then(stream => {
-                    const video = document.createElement('video');
-                    video.srcObject = stream;
-                    video.play();
-                })
-                .catch(error => {
-                    console.error("Ошибка доступа к камере:", error);
-                });
-        }
-
-        function stopCamera() {
-            // Stop the camera stream if necessary
-        }
-
-        function startSensors() {
-            // Проверяем наличие сенсоров
-            if (typeof DeviceMotionEvent.requestPermission === 'function') {
-                DeviceMotionEvent.requestPermission().then(response => {
-                    if (response === 'granted') {
-                        window.addEventListener('devicemotion', handleMotionEvent);
-                    }
-                }).catch(console.error);
-            } else {
-                window.addEventListener('devicemotion', handleMotionEvent);
+        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+          DeviceOrientationEvent.requestPermission().then(response => {
+            if (response === 'granted') {
+              window.addEventListener('deviceorientation', handleOrientationEvent);
             }
-
-            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                DeviceOrientationEvent.requestPermission().then(response => {
-                    if (response === 'granted') {
-                        window.addEventListener('deviceorientation', handleOrientationEvent);
-                    }
-                }).catch(console.error);
-            } else {
-                window.addEventListener('deviceorientation', handleOrientationEvent);
-            }
+          }).catch(console.error);
+        } else {
+          window.addEventListener('deviceorientation', handleOrientationEvent);
         }
+      }
 
-        function stopSensors() {
-            window.removeEventListener('devicemotion', handleMotionEvent);
-            window.removeEventListener('deviceorientation', handleOrientationEvent);
-        }
+      function stopSensors() {
+        window.removeEventListener('devicemotion', handleMotionEvent);
+        window.removeEventListener('deviceorientation', handleOrientationEvent);
+      }
 
-        function handleMotionEvent(event) {
-            const accelX = event.acceleration.x;
-            const accelY = event.acceleration.y;
-            const accelZ = event.acceleration.z;
-
-            document.getElementById('accelX').textContent = accelX.toFixed(2);
-            document.getElementById('accelY').textContent = accelY.toFixed(2);
-            document.getElementById('accelZ').textContent = accelZ.toFixed(2);
-
-            // Update Axes Visualization
-            document.getElementById('accelXLine').setAttribute('line', `start: 0, 0, 0; end: ${accelX * 0.5}, 0, 0`);
-            document.getElementById('accelYLine').setAttribute('line', `start: 0, 0, 0; end: 0, ${accelY * 0.5}, 0`);
-            document.getElementById('accelZLine').setAttribute('line', `start: 0, 0, 0; end: 0, 0, ${accelZ * 0.5}`);
-        }
-
-        function handleOrientationEvent(event) {
-            const gyroAlpha = event.alpha;
-            const gyroBeta = event.beta;
-            const gyroGamma = event.gamma;
-
-            document.getElementById('gyroAlpha').textContent = gyroAlpha ? gyroAlpha.toFixed(2) : 0;
-            document.getElementById('gyroBeta').textContent = gyroBeta ? gyroBeta.toFixed(2) : 0;
-            document.getElementById('gyroGamma').textContent = gyroGamma ? gyroGamma.toFixed(2) : 0;
-
-            // Update Gyroscope Axes Visualization
-            document.getElementById('gyroAlphaLine').setAttribute('line', `start: 0, 0, 0; end: ${gyroAlpha * 0.5}, 0, 0`);
-            document.getElementById('gyroBetaLine').setAttribute('line', `start: 0, 0, 0; end: 0, ${gyroBeta * 0.5}, 0`);
-            document.getElementById('gyroGammaLine').setAttribute('line', `start: 0, 0, 0; end: 0, 0, ${gyroGamma * 0.5}`);
-        }
+      function handleMotionEvent(event) {
+        document.getElementById('accelX').textContent = event.acceleration.x.toFixed(2);
+        document.getElementById('accelY').textContent = event.acceleration.y.toFixed(2);
+        document.getElementById('accelZ').textContent = event.acceleration.z.toFixed(2);
+      }
+      function handleOrientationEvent(event) {
+        document.getElementById('gyroAlpha').textContent = event.alpha ? event.alpha.toFixed(2) : 0;
+        document.getElementById('gyroBeta').textContent = event.beta ? event.beta.toFixed(2) : 0;
+        document.getElementById('gyroGamma').textContent = event.gamma ? event.gamma.toFixed(2) : 0;
+      }
     </script>
-</body>
+  </body>
 </html>
