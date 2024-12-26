@@ -4,81 +4,52 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AR Plane Detection</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+  <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+  <script src="https://aframe.io/releases/1.2.0/aframe-ar.js"></script>
 </head>
-<body>
+<body style="margin: 0; overflow: hidden;">
   <button id="startAR" style="position: fixed; top: 10px; left: 10px; z-index: 1000;">Start AR</button>
-  <script>
-    let scene, camera, renderer;
-    let hitTestSource = null;
-    let xrSession = null;
 
-    document.getElementById('startAR').addEventListener('click', async () => {
-      if (navigator.xr) {
-        xrSession = await navigator.xr.requestSession('immersive-ar', { requiredFeatures: ['hit-test'] });
-        setupARSession(xrSession);
-      } else {
-        alert('WebXR not supported on this device');
-      }
+  <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+    <a-entity id="camera" camera look-controls="enabled: false" position="0 0 0" rotation="0 0 0"></a-entity>
+    <a-entity id="plane" geometry="primitive: plane; width: 0.5; height: 0.5;" material="color: green; side: double" visible="false"></a-entity>
+
+    <a-marker id="marker" preset="hiro">
+      <a-plane position="0 0 0" rotation="-90 0 0" width="1" height="1" material="color: red;"></a-plane>
+    </a-marker>
+
+    <a-entity id="hit-test" ar-hit-test="enabled: true"></a-entity>
+  </a-scene>
+
+  <script>
+    document.getElementById('startAR').addEventListener('click', () => {
+      const scene = document.querySelector('a-scene');
+      scene.enterAR();
     });
 
-    function setupARSession(session) {
-      renderer = new THREE.WebGLRenderer({ alpha: true });
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.xr.enabled = true;
-      renderer.xr.setReferenceSpaceType('local');
-      document.body.appendChild(renderer.domElement);
+    AFRAME.registerComponent('ar-hit-test', {
+      init: function () {
+        const marker = document.getElementById('marker');
+        this.el.addEventListener('ar-hit-test', (event) => {
+          const hit = event.detail.intersection;
+          if (hit) {
+            const plane = document.getElementById('plane');
+            plane.position.set(hit.position.x, hit.position.y, hit.position.z);
+            plane.visible = true;
 
-      scene = new THREE.Scene();
-      camera = new THREE.PerspectiveCamera();
-      scene.add(camera);
-
-      session.requestReferenceSpace('viewer').then((refSpace) => {
-        session.requestHitTestSource({ space: refSpace }).then((source) => {
-          hitTestSource = source;
-        });
-      });
-
-      session.addEventListener('end', () => {
-        hitTestSource = null;
-        renderer.domElement.remove();
-      });
-
-      renderer.xr.setSession(session);
-      renderer.setAnimationLoop(render);
-    }
-
-    function render(timestamp, frame) {
-      if (frame) {
-        const viewerPose = frame.getViewerPose(renderer.xr.getReferenceSpace());
-        if (viewerPose) {
-          const hitTestResults = frame.getHitTestResults(hitTestSource);
-          if (hitTestResults.length > 0) {
-            const hit = hitTestResults[0];
-            const hitMatrix = new THREE.Matrix4().fromArray(hit.getPose(renderer.xr.getReferenceSpace()).transform.matrix);
-            const normal = new THREE.Vector3().setFromMatrixColumn(hitMatrix, 2).normalize(); // Нормаль плоскости
-
-            const isHorizontal = Math.abs(normal.y) > 0.9; // Вертикальная компонента нормали
+            const normal = hit.face.normal;
+            const isHorizontal = Math.abs(normal.y) > 0.9;
             const isVertical = Math.abs(normal.y) < 0.1 && (Math.abs(normal.x) > 0.9 || Math.abs(normal.z) > 0.9);
 
-            // Визуализация найденной плоскости
-            const geometry = new THREE.PlaneGeometry(0.5, 0.5);
-            const material = new THREE.MeshBasicMaterial({ color: isHorizontal ? 0x00ff00 : 0xff0000, side: THREE.DoubleSide });
-            const plane = new THREE.Mesh(geometry, material);
-            plane.position.setFromMatrixPosition(hitMatrix);
-            plane.lookAt(hitMatrix.elements[8], hitMatrix.elements[9], hitMatrix.elements[10]); // Устанавливаем ориентацию
-            scene.add(plane);
-
             if (isHorizontal) {
-              console.log("Horizontal plane detected");
+              console.log('Horizontal plane detected');
             } else if (isVertical) {
-              console.log("Vertical plane detected");
+              console.log('Vertical plane detected');
             }
           }
-        }
+        });
       }
-      renderer.render(scene, camera);
-    }
+    });
   </script>
 </body>
 </html>
