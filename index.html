@@ -1,87 +1,84 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Three.js AR Heatmap</title>
-    <style>
-        body { margin: 0; }
-        canvas { display: block; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AR Plane Detection</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
 </head>
 <body>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script>
-        // Проверка поддержки WebXR
-        if (navigator.xr) {
-            navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
-                if (supported) {
-                    navigator.xr.requestSession('immersive-ar').then((session) => {
-                        const renderer = new THREE.WebGLRenderer({ alpha: true });
-                        renderer.xr.enabled = true;
-                        document.body.appendChild(renderer.domElement);
+  <button id="startAR" style="position: fixed; top: 10px; left: 10px; z-index: 1000;">Start AR</button>
+  <script>
+    let scene, camera, renderer;
+    let hitTestSource = null;
+    let xrSession = null;
 
-                        const scene = new THREE.Scene();
-                        const camera = new THREE.PerspectiveCamera();
+    document.getElementById('startAR').addEventListener('click', async () => {
+      if (navigator.xr) {
+        xrSession = await navigator.xr.requestSession('immersive-ar', { requiredFeatures: ['hit-test'] });
+        setupARSession(xrSession);
+      } else {
+        alert('WebXR not supported on this device');
+      }
+    });
 
-                        const heatmapGroup = new THREE.Group();
-                        scene.add(heatmapGroup);
+    function setupARSession(session) {
+      renderer = new THREE.WebGLRenderer({ alpha: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.xr.enabled = true;
+      renderer.xr.setReferenceSpaceType('local');
+      document.body.appendChild(renderer.domElement);
 
-                        const reticleGeometry = new THREE.RingGeometry(0.05, 0.1, 32).rotateX(-Math.PI / 2);
-                        const reticleMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-                        const reticle = new THREE.Mesh(reticleGeometry, reticleMaterial);
-                        scene.add(reticle);
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera();
+      scene.add(camera);
 
-                        session.addEventListener('select', () => {
-                            // Добавление тепловой точки при выборе
-                            const position = reticle.position.clone();
-                            addHeatPoint(position);
-                        });
+      session.requestReferenceSpace('viewer').then((refSpace) => {
+        session.requestHitTestSource({ space: refSpace }).then((source) => {
+          hitTestSource = source;
+        });
+      });
 
-                        function addHeatPoint(position) {
-                            const pointGeometry = new THREE.SphereGeometry(0.05, 16, 16);
-                            const heatMaterial = new THREE.MeshBasicMaterial({ color: getColorForDensity(position) });
-                            const point = new THREE.Mesh(pointGeometry, heatMaterial);
-                            point.position.copy(position);
-                            heatmapGroup.add(point);
-                        }
+      session.addEventListener('end', () => {
+        hitTestSource = null;
+        renderer.domElement.remove();
+      });
 
-                        function getColorForDensity(position) {
-                            const density = calculateDensity(position); // Определите плотность
-                            return new THREE.Color(`hsl(${(1 - density) * 240}, 100%, 50%)`);
-                        }
+      renderer.xr.setSession(session);
+      renderer.setAnimationLoop(render);
+    }
 
-                        function calculateDensity(position) {
-                            // Примерная реализация функции для расчета плотности
-                            // Здесь вы можете использовать свою логику для определения плотности
-                            // Например, просто возвращаем случайное значение от 0 до 1
-                            return Math.random();
-                        }
+    function render(timestamp, frame) {
+      if (frame) {
+        const viewerPose = frame.getViewerPose(renderer.xr.getReferenceSpace());
+        if (viewerPose) {
+          const hitTestResults = frame.getHitTestResults(hitTestSource);
+          if (hitTestResults.length > 0) {
+            const hit = hitTestResults[0];
+            const hitMatrix = new THREE.Matrix4().fromArray(hit.getPose(renderer.xr.getReferenceSpace()).transform.matrix);
+            const normal = new THREE.Vector3().setFromMatrixColumn(hitMatrix, 2).normalize(); // Нормаль плоскости
 
-                        function render(timestamp, frame) {
-                            if (frame) {
-                                const viewerSpace = frame.getViewerPose(renderer.xr.getReferenceSpace());
-                                if (viewerSpace) {
-                                    reticle.position.set(viewerSpace.transform.position.x, 0, viewerSpace.transform.position.z);
-                                }
-                            }
+            const isHorizontal = Math.abs(normal.y) > 0.9; // Вертикальная компонента нормали
+            const isVertical = Math.abs(normal.y) < 0.1 && (Math.abs(normal.x) > 0.9 || Math.abs(normal.z) > 0.9);
 
-                            renderer.render(scene, camera);
-                        }
+            // Визуализация найденной плоскости
+            const geometry = new THREE.PlaneGeometry(0.5, 0.5);
+            const material = new THREE.MeshBasicMaterial({ color: isHorizontal ? 0x00ff00 : 0xff0000, side: THREE.DoubleSide });
+            const plane = new THREE.Mesh(geometry, material);
+            plane.position.setFromMatrixPosition(hitMatrix);
+            plane.lookAt(hitMatrix.elements[8], hitMatrix.elements[9], hitMatrix.elements[10]); // Устанавливаем ориентацию
+            scene.add(plane);
 
-                        renderer.setAnimationLoop(render);
-                    }).catch((error) => {
-                        console.error('Ошибка при запросе сессии:', error);
-                    });
-                } else {
-                    console.log('Immersive AR sessions not supported.');
-                }
-            }).catch((error) => {
-                console.error('Ошибка при проверке поддержки сессии:', error);
-            });
-        } else {
-            console.error('WebXR не поддерживается в этом браузере.');
+            if (isHorizontal) {
+              console.log("Horizontal plane detected");
+            } else if (isVertical) {
+              console.log("Vertical plane detected");
+            }
+          }
         }
-    </script>
+      }
+      renderer.render(scene, camera);
+    }
+  </script>
 </body>
 </html>
