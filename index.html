@@ -1,132 +1,86 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AR with Sensors</title>
-    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-    <script src="https://cdn.rawgit.com/jeromeetienne/AR.js/2.1.4/aframe/build/aframe-ar.js"></script>
+    <title>Three.js AR Heatmap</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+    </style>
 </head>
-<body style="margin: 0">
-
-    <button onclick="toggleCameraAndSensors()" style="position: fixed; top: 10px; left: 10px; z-index: 1000;">Toggle Camera and Sensors</button>
-
-    <div id="sensorData" style="position: fixed; top: 50px; left: 10px; background: rgba(255, 255, 255, 0.8); padding: 10px; z-index: 1000; display: none;">
-        <h3>Sensor Data</h3>
-        <p><strong>Accelerometer:</strong></p>
-        <p>x: <span id="accelX">0</span></p>
-        <p>y: <span id="accelY">0</span></p>
-        <p>z: <span id="accelZ">0</span></p>
-        <p><strong>Gyroscope:</strong></p>
-        <p>alpha: <span id="gyroAlpha">0</span></p>
-        <p>beta: <span id="gyroBeta">0</span></p>
-        <p>gamma: <span id="gyroGamma">0</span></p>
-    </div>
-
-    <a-scene>
-        <!-- Camera Entity -->
-        <a-entity camera></a-entity>
-
-        <!-- Axes Visualization -->
-        <a-entity id="accelXLine" line="start: 0, 0, 0; end: 0.5, 0, 0; color: red; lineWidth: 10" position="0 0 -3"></a-entity>
-        <a-entity id="accelYLine" line="start: 0, 0, 0; end: 0, 0.5, 0; color: green; lineWidth: 10" position="0 0 -3"></a-entity>
-        <a-entity id="accelZLine" line="start: 0, 0, 0; end: 0, 0, 0.5; color: blue; lineWidth: 10" position="0 0 -3"></a-entity>
-
-        <a-entity id="gyroAlphaLine" line="start: 0, 0, 0; end: 0.5, 0, 0; color: red; lineWidth: 10" position="0 0 -3"></a-entity>
-        <a-entity id="gyroBetaLine" line="start: 0, 0, 0; end: 0, 0.5, 0; color: green; lineWidth: 10" position="0 0 -3"></a-entity>
-        <a-entity id="gyroGammaLine" line="start: 0, 0, 0; end: 0, 0, 0.5; color: blue; lineWidth: 10" position="0 0 -3"></a-entity>
-
-        <a-entity id="heatmap" visible="false"></a-entity>
-    </a-scene>
-
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
-        let sensorsActive = false;
+        // Проверка поддержки WebXR
+        if (navigator.xr) {
+            navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+                if (supported) {
+                    navigator.xr.requestSession('immersive-ar').then((session) => {
+                        const renderer = new THREE.WebGLRenderer({ alpha: true });
+                        renderer.xr.enabled = true;
+                        document.body.appendChild(renderer.domElement);
 
-        function toggleCameraAndSensors() {
-            sensorsActive = !sensorsActive;
-            document.getElementById('sensorData').style.display = sensorsActive ? 'block' : 'none';
+                        const scene = new THREE.Scene();
+                        const camera = new THREE.PerspectiveCamera();
 
-            if (sensorsActive) {
-                startCamera();
-                startSensors();
-            } else {
-                stopCamera();
-                stopSensors();
-            }
-        }
+                        const heatmapGroup = new THREE.Group();
+                        scene.add(heatmapGroup);
 
-        function startCamera() {
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-                .then(stream => {
-                    const video = document.createElement('video');
-                    video.srcObject = stream;
-                    video.play();
-                })
-                .catch(error => {
-                    console.error("Ошибка доступа к камере:", error);
-                });
-        }
+                        const reticleGeometry = new THREE.RingGeometry(0.05, 0.1, 32).rotateX(-Math.PI / 2);
+                        const reticleMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+                        const reticle = new THREE.Mesh(reticleGeometry, reticleMaterial);
+                        scene.add(reticle);
 
-        function stopCamera() {
-            // Stop the camera stream if necessary
-        }
+                        session.addEventListener('select', () => {
+                            // Добавление тепловой точки при выборе
+                            const position = reticle.position.clone();
+                            addHeatPoint(position);
+                        });
 
-        function startSensors() {
-            // Проверяем наличие сенсоров
-            if (typeof DeviceMotionEvent.requestPermission === 'function') {
-                DeviceMotionEvent.requestPermission().then(response => {
-                    if (response === 'granted') {
-                        window.addEventListener('devicemotion', handleMotionEvent);
-                    }
-                }).catch(console.error);
-            } else {
-                window.addEventListener('devicemotion', handleMotionEvent);
-            }
+                        function addHeatPoint(position) {
+                            const pointGeometry = new THREE.SphereGeometry(0.05, 16, 16);
+                            const heatMaterial = new THREE.MeshBasicMaterial({ color: getColorForDensity(position) });
+                            const point = new THREE.Mesh(pointGeometry, heatMaterial);
+                            point.position.copy(position);
+                            heatmapGroup.add(point);
+                        }
 
-            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                DeviceOrientationEvent.requestPermission().then(response => {
-                    if (response === 'granted') {
-                        window.addEventListener('deviceorientation', handleOrientationEvent);
-                    }
-                }).catch(console.error);
-            } else {
-                window.addEventListener('deviceorientation', handleOrientationEvent);
-            }
-        }
+                        function getColorForDensity(position) {
+                            const density = calculateDensity(position); // Определите плотность
+                            return new THREE.Color(`hsl(${(1 - density) * 240}, 100%, 50%)`);
+                        }
 
-        function stopSensors() {
-            window.removeEventListener('devicemotion', handleMotionEvent);
-            window.removeEventListener('deviceorientation', handleOrientationEvent);
-        }
+                        function calculateDensity(position) {
+                            // Примерная реализация функции для расчета плотности
+                            // Здесь вы можете использовать свою логику для определения плотности
+                            // Например, просто возвращаем случайное значение от 0 до 1
+                            return Math.random();
+                        }
 
-        function handleMotionEvent(event) {
-            const accelX = event.acceleration.x;
-            const accelY = event.acceleration.y;
-            const accelZ = event.acceleration.z;
+                        function render(timestamp, frame) {
+                            if (frame) {
+                                const viewerSpace = frame.getViewerPose(renderer.xr.getReferenceSpace());
+                                if (viewerSpace) {
+                                    reticle.position.set(viewerSpace.transform.position.x, 0, viewerSpace.transform.position.z);
+                                }
+                            }
 
-            document.getElementById('accelX').textContent = accelX.toFixed(2);
-            document.getElementById('accelY').textContent = accelY.toFixed(2);
-            document.getElementById('accelZ').textContent = accelZ.toFixed(2);
+                            renderer.render(scene, camera);
+                        }
 
-            // Update Axes Visualization
-            document.getElementById('accelXLine').setAttribute('line', `start: 0, 0, 0; end: ${accelX * 0.5}, 0, 0`);
-            document.getElementById('accelYLine').setAttribute('line', `start: 0, 0, 0; end: 0, ${accelY * 0.5}, 0`);
-            document.getElementById('accelZLine').setAttribute('line', `start: 0, 0, 0; end: 0, 0, ${accelZ * 0.5}`);
-        }
-
-        function handleOrientationEvent(event) {
-            const gyroAlpha = event.alpha;
-            const gyroBeta = event.beta;
-            const gyroGamma = event.gamma;
-
-            document.getElementById('gyroAlpha').textContent = gyroAlpha ? gyroAlpha.toFixed(2) : 0;
-            document.getElementById('gyroBeta').textContent = gyroBeta ? gyroBeta.toFixed(2) : 0;
-            document.getElementById('gyroGamma').textContent = gyroGamma ? gyroGamma.toFixed(2) : 0;
-
-            // Update Gyroscope Axes Visualization
-            document.getElementById('gyroAlphaLine').setAttribute('line', `start: 0, 0, 0; end: ${gyroAlpha * 0.5}, 0, 0`);
-            document.getElementById('gyroBetaLine').setAttribute('line', `start: 0, 0, 0; end: 0, ${gyroBeta * 0.5}, 0`);
-            document.getElementById('gyroGammaLine').setAttribute('line', `start: 0, 0, 0; end: 0, 0, ${gyroGamma * 0.5}`);
+                        renderer.setAnimationLoop(render);
+                    }).catch((error) => {
+                        console.error('Ошибка при запросе сессии:', error);
+                    });
+                } else {
+                    console.log('Immersive AR sessions not supported.');
+                }
+            }).catch((error) => {
+                console.error('Ошибка при проверке поддержки сессии:', error);
+            });
+        } else {
+            console.error('WebXR не поддерживается в этом браузере.');
         }
     </script>
 </body>
